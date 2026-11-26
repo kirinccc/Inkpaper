@@ -8,6 +8,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -82,7 +84,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun InkBookSourcesScreen(
     onBack: () -> Unit,
@@ -578,6 +580,48 @@ fun InkBookSourcesScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text("书源订阅管理", color = colors.ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                Text("快捷添加社区维护订阅", color = colors.inkSecondary, fontSize = 12.sp)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    InkFilterChip(
+                        text = "XIU2 精选源",
+                        selected = false,
+                        onClick = {
+                            if (!isSyncingSub) {
+                                viewModel.addSubscription(
+                                    "XIU2 精选源",
+                                    "https://cdn.jsdmirror.com/gh/XIU2/Yuedu/shuyuan",
+                                )
+                            }
+                        },
+                    )
+                    InkFilterChip(
+                        text = "YCK 综合源",
+                        selected = false,
+                        onClick = {
+                            if (!isSyncingSub) {
+                                viewModel.addSubscription(
+                                    "YCK 综合源",
+                                    "https://cdn.jsdelivr.net/gh/liufuyou/read@main/sources/yck-novel.json",
+                                )
+                            }
+                        },
+                    )
+                    InkFilterChip(
+                        text = "Yiove 综合源",
+                        selected = false,
+                        onClick = {
+                            if (!isSyncingSub) {
+                                viewModel.addSubscription(
+                                    "Yiove 综合源",
+                                    "https://cdn.jsdelivr.net/gh/liufuyou/read@main/sources/yiove-novel.json",
+                                )
+                            }
+                        },
+                    )
+                }
                 OutlinedTextField(
                     value = subName,
                     onValueChange = { subName = it },

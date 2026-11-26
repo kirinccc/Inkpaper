@@ -40,6 +40,10 @@ data class InkSearchUiState(
     val isAddingUrl: Boolean = false,
     val urlAddError: String? = null,
     val urlAddNeedEnableSource: Boolean = false,
+    val hasStrongMatch: Boolean = false,
+    val showWeakMatches: Boolean = false,
+    val isLoadingPlatformHints: Boolean = false,
+    val platformHints: List<InkPlatformBookHint> = emptyList(),
 )
 
 class InkSearchViewModel : ViewModel() {
@@ -79,6 +83,10 @@ class InkSearchViewModel : ViewModel() {
                         results = emptyList(),
                         errorMessage = null,
                         fallbackHints = emptyList(),
+                        hasStrongMatch = false,
+                        showWeakMatches = false,
+                        isLoadingPlatformHints = false,
+                        platformHints = emptyList(),
                     )
                 }
             }
@@ -90,22 +98,43 @@ class InkSearchViewModel : ViewModel() {
             }
 
             override fun onSearchSuccess(searchBooks: List<SearchBook>) {
-                val snapshot = ArrayList(searchBooks)
-                _uiState.update { it.copy(results = snapshot) }
+                val currentQuery = _uiState.value.query
+                val (strong, weak) = searchBooks.partition {
+                    InkSearchQueryHelper.isStrongSearchMatch(it.name, it.author, currentQuery)
+                }
+                val ordered = ArrayList<SearchBook>(strong.size + weak.size).apply {
+                    addAll(strong)
+                    addAll(weak)
+                }
+                _uiState.update {
+                    it.copy(
+                        results = ordered,
+                        hasStrongMatch = strong.isNotEmpty(),
+                    )
+                }
             }
 
             override fun onSearchFinish(isEmpty: Boolean, hasMore: Boolean) {
+                var queryToFetchHints: String? = null
                 _uiState.update { state ->
-                    val hints = if (state.results.size < 3) {
+                    val strongFound = state.results.any {
+                        InkSearchQueryHelper.isStrongSearchMatch(it.name, it.author, state.query)
+                    }
+                    val hints = if (!strongFound || state.results.size < 3) {
                         InkSearchQueryHelper.generateFallbackHints(state.query)
                     } else {
                         emptyList()
                     }
+                    if (!strongFound && state.query.isNotBlank()) {
+                        queryToFetchHints = state.query
+                    }
                     state.copy(
                         isSearching = false,
+                        hasStrongMatch = strongFound,
                         fallbackHints = hints,
                     )
                 }
+                queryToFetchHints?.let(::loadPlatformHints)
             }
 
             override fun onSearchCancel(exception: Throwable?) {
@@ -191,6 +220,24 @@ class InkSearchViewModel : ViewModel() {
                 LocalConfig.lastSearchGroup = null
                 _uiState.update { it.copy(selectedGroup = null) }
                 submitSearch(currentQuery)
+            }
+        }
+    }
+
+    fun toggleShowWeakMatches() {
+        _uiState.update { it.copy(showWeakMatches = !it.showWeakMatches) }
+    }
+
+    private fun loadPlatformHints(query: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update { it.copy(isLoadingPlatformHints = true) }
+            val hints = InkPlatformHintFetcher.fetchFanqieHints(query, limit = 3)
+            _uiState.update { state ->
+                if (state.query == query) {
+                    state.copy(isLoadingPlatformHints = false, platformHints = hints)
+                } else {
+                    state
+                }
             }
         }
     }

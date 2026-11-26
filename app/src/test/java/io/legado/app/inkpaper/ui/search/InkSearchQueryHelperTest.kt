@@ -58,4 +58,58 @@ class InkSearchQueryHelperTest {
         assertTrue(InkSearchQueryHelper.isSameAuthor("", "弊不可避"))
         assertFalse(InkSearchQueryHelper.isSameAuthor("天蚕土豆", "弊不可避"))
     }
+
+    @Test
+    fun isStrongSearchMatch_filtersNoisySingleCharMatches() {
+        assertFalse(
+            InkSearchQueryHelper.isStrongSearchMatch(
+                "我身上有一个不可战胜的夏天",
+                "(法)加缪",
+                "我的末世修罗场果然有问题",
+            ),
+        )
+        assertTrue(
+            InkSearchQueryHelper.isStrongSearchMatch(
+                "我的末世修罗场果然有问题",
+                "弊不可避",
+                "我的末世修罗场果然有问题",
+            ),
+        )
+        assertTrue(
+            InkSearchQueryHelper.isStrongSearchMatch(
+                "末世：避难所太挤，女神请自重",
+                "弊不可避",
+                "弊不可避",
+            ),
+        )
+    }
+
+    @Test
+    fun parseFanqieHintsJson_extractsBookInfoAndStripsEmTags() {
+        val sample = """
+            {
+              "code": 0,
+              "data": {
+                "ret_data": [
+                  {
+                    "book_id": "7592266630982290494",
+                    "title": "<em>末世</em>：避难所太挤，女神请自重",
+                    "author": "<em>弊不可避</em>",
+                    "category": "科幻末世",
+                    "score": "8.5",
+                    "abstract": "全球冰封，万物死寂。",
+                    "thumb_url": "https://example.com/cover.jpg"
+                  }
+                ]
+              }
+            }
+        """.trimIndent()
+        val parsed = InkPlatformHintFetcher.parseFanqieHintsJson(sample, limit = 3)
+        assertEquals(1, parsed.size)
+        val first = parsed.first()
+        assertEquals("7592266630982290494", first.bookId)
+        assertEquals("末世：避难所太挤，女神请自重", first.title)
+        assertEquals("弊不可避", first.author)
+        assertEquals("https://fanqienovel.com/page/7592266630982290494", first.webUrl)
+    }
 }

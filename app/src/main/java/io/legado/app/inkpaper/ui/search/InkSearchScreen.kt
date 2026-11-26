@@ -67,6 +67,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.inkpaper.design.InkBookCover
+import io.legado.app.inkpaper.design.InkCardGroup
 import io.legado.app.inkpaper.design.InkEmptyState
 import io.legado.app.inkpaper.design.InkFilterChip
 import io.legado.app.inkpaper.design.InkTheme
@@ -332,44 +333,113 @@ fun InkSearchScreen(
                 )
             }
 
-            if (!state.isSearching && state.results.isEmpty()) {
-                Column(
+            if (!state.isSearching && !state.hasStrongMatch) {
+                LazyColumn(
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                     modifier = Modifier
                         .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp, vertical = 20.dp)
                         .navigationBarsPadding(),
-                    verticalArrangement = Arrangement.spacedBy(18.dp),
                 ) {
-                    InkEmptyState(
-                        title = "未找到相关书籍",
-                        subtitle = state.errorMessage ?: "可能是平台改名书、小众原创或当前分组未收录",
-                    )
-                    InkSearchFallbackPanel(
-                        query = state.query,
-                        precisionSearch = state.precisionSearch,
-                        selectedGroup = state.selectedGroup,
-                        disabledBackupCount = disabledBackupCount,
-                        fallbackHints = state.fallbackHints,
-                        onTogglePrecision = { viewModel.togglePrecisionSearch() },
-                        onResetGroup = { viewModel.selectGroup(null) },
-                        onEnableBackupRetry = { viewModel.enableBackupSourcesAndRetry() },
-                        onRetryHint = { hint -> viewModel.submitSearch(hint) },
-                        onOpenWebSearch = {
-                            webSearchLauncher.launch(
-                                Intent(context, WebViewActivity::class.java).apply {
-                                    putExtra("url", InkSearchQueryHelper.buildWebSearchUrl(state.query))
-                                    putExtra("title", "全网查书：${state.query}")
-                                    putExtra("enableSearchReturn", true)
+                    if (state.results.isEmpty()) {
+                        item(key = "empty_header") {
+                            InkEmptyState(
+                                title = "未找到相关书籍",
+                                subtitle = state.errorMessage ?: "可能是平台改名书、小众原创或当前分组未收录",
+                            )
+                        }
+                    }
+                    if (state.isLoadingPlatformHints) {
+                        item(key = "platform_hints_loading") {
+                            Text(
+                                text = "正在检索番茄书库关联书名与作者...",
+                                color = colors.inkSecondary,
+                                fontSize = 12.5.sp,
+                            )
+                        }
+                    }
+                    if (state.platformHints.isNotEmpty()) {
+                        item(key = "platform_hints_card") {
+                            InkPlatformHintsCard(
+                                hints = state.platformHints,
+                                onSearchText = { nextQuery ->
+                                    keyboard?.hide()
+                                    viewModel.submitSearch(nextQuery)
+                                },
+                                onOpenWebPage = { hint ->
+                                    webSearchLauncher.launch(
+                                        Intent(context, WebViewActivity::class.java).apply {
+                                            putExtra("url", hint.webUrl)
+                                            putExtra("title", hint.title)
+                                            putExtra("enableSearchReturn", true)
+                                        },
+                                    )
                                 },
                             )
-                        },
-                        onOpenAddUrl = {
-                            urlSheetInitialInput = ""
-                            viewModel.clearUrlAddError()
-                            showAddUrlSheet = true
-                        },
-                    )
+                        }
+                    }
+                    item(key = "fallback_panel_top") {
+                        InkSearchFallbackPanel(
+                            query = state.query,
+                            precisionSearch = state.precisionSearch,
+                            selectedGroup = state.selectedGroup,
+                            disabledBackupCount = disabledBackupCount,
+                            fallbackHints = state.fallbackHints,
+                            onTogglePrecision = { viewModel.togglePrecisionSearch() },
+                            onResetGroup = { viewModel.selectGroup(null) },
+                            onEnableBackupRetry = { viewModel.enableBackupSourcesAndRetry() },
+                            onRetryHint = { hint -> viewModel.submitSearch(hint) },
+                            onOpenWebSearch = {
+                                webSearchLauncher.launch(
+                                    Intent(context, WebViewActivity::class.java).apply {
+                                        putExtra("url", InkSearchQueryHelper.buildWebSearchUrl(state.query))
+                                        putExtra("title", "全网查书：${state.query}")
+                                        putExtra("enableSearchReturn", true)
+                                    },
+                                )
+                            },
+                            onOpenAddUrl = {
+                                urlSheetInitialInput = ""
+                                viewModel.clearUrlAddError()
+                                showAddUrlSheet = true
+                            },
+                        )
+                    }
+                    if (state.results.isNotEmpty()) {
+                        item(key = "weak_toggle") {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(colors.chip)
+                                    .clickable { viewModel.toggleShowWeakMatches() }
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "已折叠 ${state.results.size} 条弱相关模糊结果",
+                                    color = colors.inkSecondary,
+                                    fontSize = 12.5.sp,
+                                )
+                                Text(
+                                    text = if (state.showWeakMatches) "收起" else "展开",
+                                    color = colors.ink,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                            }
+                        }
+                        if (state.showWeakMatches) {
+                            items(state.results, key = { it.bookUrl }) { item ->
+                                SearchResultRow(
+                                    item = item,
+                                    onClick = { onSelectResult(item) },
+                                )
+                                HorizontalDivider(thickness = 0.5.dp, color = colors.line)
+                            }
+                        }
+                    }
                 }
             } else {
                 LazyColumn(
@@ -436,6 +506,92 @@ fun InkSearchScreen(
             },
             onOpenBookSources = onOpenBookSources,
         )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun InkPlatformHintsCard(
+    hints: List<InkPlatformBookHint>,
+    onSearchText: (String) -> Unit,
+    onOpenWebPage: (InkPlatformBookHint) -> Unit,
+) {
+    val colors = InkTheme.colors
+    InkCardGroup {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "番茄书库关联结果（可直接网页免费阅读或改搜）",
+                color = colors.ink,
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            hints.forEachIndexed { index, hint ->
+                if (index > 0) {
+                    HorizontalDivider(thickness = 0.5.dp, color = colors.line)
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = hint.title,
+                        color = colors.ink,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    val meta = listOfNotNull(
+                        hint.author.takeIf { it.isNotBlank() },
+                        hint.category.takeIf { it.isNotBlank() },
+                        hint.score.takeIf { it.isNotBlank() }?.let { "${it}分" },
+                    ).joinToString(" · ")
+                    if (meta.isNotEmpty()) {
+                        Text(
+                            text = meta,
+                            color = colors.inkSecondary,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (hint.abstractText.isNotBlank()) {
+                        Text(
+                            text = hint.abstractText,
+                            color = colors.inkTertiary,
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        InkFilterChip(
+                            text = "搜书名",
+                            selected = false,
+                            onClick = { onSearchText(hint.title) },
+                        )
+                        if (hint.author.isNotBlank()) {
+                            InkFilterChip(
+                                text = "搜作者「${hint.author}」",
+                                selected = false,
+                                onClick = { onSearchText(hint.author) },
+                            )
+                        }
+                        InkFilterChip(
+                            text = "番茄网页免费阅读 ↗",
+                            selected = true,
+                            onClick = { onOpenWebPage(hint) },
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

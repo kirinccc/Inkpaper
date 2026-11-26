@@ -118,4 +118,26 @@ object InkSearchQueryHelper {
             normA.contains(normB, ignoreCase = true) ||
             normB.contains(normA, ignoreCase = true)
     }
+
+    /**
+     * Returns true when a search result has a strong title or author match with the query,
+     * filtering out noisy single-character fuzzy matches from remote sources.
+     */
+    fun isStrongSearchMatch(bookName: String, bookAuthor: String, rawQuery: String): Boolean {
+        val cleanQuery = normalizeQuery(rawQuery)
+        if (cleanQuery.isEmpty()) return false
+        val normName = normalizeQuery(bookName)
+        val normAuthor = bookAuthor.trim().replace(whitespaceRegex, "")
+        val compactQuery = cleanQuery.replace(titlePunctuationRegex, "")
+        val compactName = normName.replace(titlePunctuationRegex, "")
+        if (compactName.isNotEmpty() && compactQuery.isNotEmpty() && compactName.equals(compactQuery, ignoreCase = true)) {
+            return true
+        }
+        if (normName.contains(cleanQuery, ignoreCase = true)) return true
+        if (normAuthor.isNotEmpty() && normAuthor.contains(cleanQuery, ignoreCase = true)) return true
+        if (compactQuery.length >= 4 && compactName.length >= 4 && compactQuery.contains(compactName, ignoreCase = true)) {
+            return true
+        }
+        return false
+    }
 }

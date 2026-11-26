@@ -92,3 +92,11 @@
 - **内置浏览器回搜与直达加书**：`WebViewActivity` 新增「用选中文字搜书」与「用当前网址加书」菜单项，从搜索页拉起外部查书后可一键带回作者/旧书名重搜或直接解析入架。
 - **老用户书源一键重置**：`DefaultData` 新增 `resetToDefaultBookSources()`，并在 `InkBookSourcesScreen` 批量菜单提供「重置为内置精选书源（清空旧源）」。
 - **搜书分组记忆与免费源优先级**：`LocalConfig.lastSearchGroup` 持久化记忆上次选中的搜书分组；重整 `bookSources.json` 的 `weight` 与 `customOrder` 权重层级，并在 `InkChangeSourceSheet` 按 `originOrder` 优先展示免费精选源。
+
+---
+
+## Phase 8：番茄实时线索发现、噪声折叠与社区书源扩充（已完成）
+
+- **实时平台线索发现**：新增 `InkPlatformHintFetcher` 对接公开 `novel.snssdk.com` 搜索接口；当本地书源未强命中时，自动在结果页顶部呈现「番茄书库关联结果」，直接展示原名/曾用名、作者与简介，支持一键改搜或直达番茄网页版免费阅读。
+- **弱相关噪声折叠**：新增 `InkSearchQueryHelper.isStrongSearchMatch`，当远程源返回大量无关单字分词结果时自动折叠弱相关条目，确保改名/兜底面板始终置顶可见。
+- **书源质量修正与社区订阅预设**：下线失效的 `reading.snssdk.com#lcs`，将易产生单字噪声的 `移动阅读` 降级为长尾备用，修复 `潇湘书院` 作者名 PUA 乱码，新增实测可用的 `大唐小说 / 塔读小说 / SF轻小说`，并在订阅管理提供 `XIU2 / YCK / Yiove` 一键订阅预设。
