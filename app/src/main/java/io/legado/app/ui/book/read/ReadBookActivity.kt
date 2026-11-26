@@ -105,6 +105,7 @@ import io.legado.app.ui.book.read.config.MoreConfigDialog
 import io.legado.app.ui.book.read.config.ReadAloudDialog
 import io.legado.app.ui.book.read.config.ReaderMenuConfigDialog
 import io.legado.app.ui.book.read.config.ReadStyleDialog
+import io.legado.app.ui.book.read.config.SpeakEngineDialog
 import io.legado.app.ui.book.read.config.TextSelectMenuConfigDialog
 import io.legado.app.ui.book.read.config.TipConfigDialog.Companion.TITLE_COLOR
 import io.legado.app.ui.book.read.config.TipConfigDialog.Companion.TITLE_NUMBER_COLOR
@@ -287,7 +288,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
     private var menu: Menu? = null
     private val inkOverlayState = mutableStateOf(InkReaderOverlayState())
-    override fun isInkOverlayVisible(): Boolean = inkOverlayState.value.visible
+    override fun isInkOverlayVisible(): Boolean = inkOverlayState.value.hasAnyVisibleLayer
     private var backupJob: Job? = null
     private var bookmarkJob: Job? = null
     private var replacePreviewJob: Job? = null
@@ -599,7 +600,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
         }
         onBackPressedDispatcher.addCallback(this) {
-            if (inkOverlayState.value.visible) {
+            if (inkOverlayState.value.hasAnyVisibleLayer) {
                 hideInkOverlay()
                 return@addCallback
             }
@@ -2071,7 +2072,11 @@ class ReadBookActivity : BaseReadBookActivity(),
      * 显示朗读菜单
      */
     override fun showReadAloudDialog() {
-        showDialogFragment<ReadAloudDialog>()
+        inkOverlayState.value = inkOverlayState.value.copy(
+            visible = false,
+            showReadAloudSheet = true,
+        )
+        onMenuShow()
     }
 
     /**
@@ -3508,6 +3513,10 @@ class ReadBookActivity : BaseReadBookActivity(),
             brightness = (AppConfig.readBrightness / 255f).coerceIn(0.01f, 1f),
             showQuickSettings = if (visible) current.showQuickSettings else false,
             showMoreActions = if (visible) current.showMoreActions else false,
+            showTocSheet = if (visible) current.showTocSheet else false,
+            showChangeSourceSheet = if (visible) current.showChangeSourceSheet else false,
+            showReadAloudSheet = if (visible) current.showReadAloudSheet else false,
+            showMoreTypographySheet = if (visible) current.showMoreTypographySheet else false,
         )
     }
 
@@ -3518,7 +3527,7 @@ class ReadBookActivity : BaseReadBookActivity(),
     }
 
     private fun hideInkOverlay() {
-        if (!inkOverlayState.value.visible) return
+        if (!inkOverlayState.value.hasAnyVisibleLayer) return
         syncInkOverlayState(visible = false)
         onMenuHide()
         upSystemUiVisibility()
@@ -3559,17 +3568,54 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
 
         override fun onOpenToc() {
-            hideInkOverlay()
-            openChapterList()
+            inkOverlayState.value = inkOverlayState.value.copy(
+                visible = false,
+                showTocSheet = true,
+            )
+        }
+
+        override fun onCloseToc() {
+            inkOverlayState.value = inkOverlayState.value.copy(showTocSheet = false)
+            if (!inkOverlayState.value.hasAnyVisibleLayer) {
+                onMenuHide()
+                upSystemUiVisibility()
+            }
+        }
+
+        override fun onSelectTocChapter(index: Int) {
+            if (index != ReadBook.durChapterIndex) {
+                viewModel.openChapter(index)
+            }
+        }
+
+        override fun onSelectBookmark(bookmark: Bookmark) {
+            ReadBook.openChapter(bookmark.chapterIndex, bookmark.chapterPos)
+        }
+
+        override fun onSelectHighlight(highlight: BookHighlight) {
+            ReadBook.openChapter(highlight.chapterIndex, highlight.chapterPos)
         }
 
         override fun onOpenAloud() {
-            hideInkOverlay()
-            if (BaseReadAloudService.isRun) {
-                showReadAloudDialog()
-            } else {
+            if (!BaseReadAloudService.isRun) {
                 ReadBook.readAloud()
             }
+            inkOverlayState.value = inkOverlayState.value.copy(
+                visible = false,
+                showReadAloudSheet = true,
+            )
+        }
+
+        override fun onCloseReadAloud() {
+            inkOverlayState.value = inkOverlayState.value.copy(showReadAloudSheet = false)
+            if (!inkOverlayState.value.hasAnyVisibleLayer) {
+                onMenuHide()
+                upSystemUiVisibility()
+            }
+        }
+
+        override fun onOpenSpeakEngineDialog() {
+            showDialogFragment<SpeakEngineDialog>()
         }
 
         override fun onToggleNight() {
@@ -3601,8 +3647,25 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
 
         override fun onOpenChangeSource() {
-            hideInkOverlay()
-            showBookChangeSource()
+            inkOverlayState.value = inkOverlayState.value.copy(
+                visible = false,
+                showMoreActions = false,
+                showChangeSourceSheet = true,
+            )
+        }
+
+        override fun onCloseChangeSource() {
+            inkOverlayState.value = inkOverlayState.value.copy(showChangeSourceSheet = false)
+            if (!inkOverlayState.value.hasAnyVisibleLayer) {
+                onMenuHide()
+                upSystemUiVisibility()
+            }
+        }
+
+        override fun onSwitchSource(source: BookSource, book: Book, toc: List<BookChapter>) {
+            changeTo(source, book, toc) {
+                onCloseChangeSource()
+            }
         }
 
         override fun onOpenSearchContent() {
@@ -3626,6 +3689,27 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
 
         override fun onOpenMoreTypography() {
+            inkOverlayState.value = inkOverlayState.value.copy(
+                visible = false,
+                showQuickSettings = false,
+                showMoreTypographySheet = true,
+            )
+        }
+
+        override fun onCloseMoreTypography() {
+            inkOverlayState.value = inkOverlayState.value.copy(showMoreTypographySheet = false)
+            if (!inkOverlayState.value.hasAnyVisibleLayer) {
+                onMenuHide()
+                upSystemUiVisibility()
+            }
+        }
+
+        override fun onParagraphModeChanged(enabled: Boolean) {
+            putPrefBoolean(PreferKey.paragraphReadMode, enabled)
+            updateParagraphMode()
+        }
+
+        override fun onOpenLegacyMoreConfig() {
             hideInkOverlay()
             showDialogFragment<MoreConfigDialog>()
         }

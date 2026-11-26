@@ -67,6 +67,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorInt
 import io.legado.app.constant.PageAnim
+import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.BookChapter
+import io.legado.app.data.entities.BookHighlight
+import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.Bookmark
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.font.BuiltinFonts
@@ -75,6 +80,7 @@ import io.legado.app.inkpaper.design.InkListRow
 import io.legado.app.inkpaper.design.InkSegmentedControl
 import io.legado.app.inkpaper.design.InkSwitch
 import io.legado.app.inkpaper.design.InkTheme
+import io.legado.app.model.ReadBook
 import kotlin.math.roundToInt
 
 data class InkReaderOverlayState(
@@ -86,9 +92,17 @@ data class InkReaderOverlayState(
     val isNight: Boolean = false,
     val showQuickSettings: Boolean = false,
     val showMoreActions: Boolean = false,
+    val showTocSheet: Boolean = false,
+    val showChangeSourceSheet: Boolean = false,
+    val showReadAloudSheet: Boolean = false,
+    val showMoreTypographySheet: Boolean = false,
     val brightnessAuto: Boolean = true,
     val brightness: Float = 0.5f,
-)
+) {
+    val hasAnyVisibleLayer: Boolean
+        get() = visible || showQuickSettings || showMoreActions ||
+            showTocSheet || showChangeSourceSheet || showReadAloudSheet || showMoreTypographySheet
+}
 
 interface InkReaderActions {
     fun onDismiss()
@@ -98,18 +112,29 @@ interface InkReaderActions {
     fun onNextChapter()
     fun onSeekChapter(index: Int)
     fun onOpenToc()
+    fun onCloseToc()
+    fun onSelectTocChapter(index: Int)
+    fun onSelectBookmark(bookmark: Bookmark)
+    fun onSelectHighlight(highlight: BookHighlight)
     fun onOpenAloud()
+    fun onCloseReadAloud()
+    fun onOpenSpeakEngineDialog()
     fun onToggleNight()
     fun onOpenQuickSettings()
     fun onCloseQuickSettings()
     fun onOpenMoreActions()
     fun onCloseMoreActions()
     fun onOpenChangeSource()
+    fun onCloseChangeSource()
+    fun onSwitchSource(source: BookSource, book: Book, toc: List<BookChapter>)
     fun onOpenSearchContent()
     fun onRefreshChapter()
     fun onToggleAutoPage()
     fun onOpenBookDetail()
     fun onOpenMoreTypography()
+    fun onCloseMoreTypography()
+    fun onParagraphModeChanged(enabled: Boolean)
+    fun onOpenLegacyMoreConfig()
     fun onTypographyChanged()
     fun onBackgroundChanged(bgHex: String, textHex: String, darkStatusIcon: Boolean)
     fun onPageAnimChanged(anim: Int)
@@ -678,6 +703,44 @@ fun InkReaderOverlay(
                 )
             }
         }
+    }
+
+    val currentBook = ReadBook.book
+    if (state.showTocSheet && currentBook != null) {
+        InkReaderTocSheet(
+            book = currentBook,
+            currentChapterIndex = state.chapterIndex,
+            onDismiss = actions::onCloseToc,
+            onSelectChapter = actions::onSelectTocChapter,
+            onSelectBookmark = actions::onSelectBookmark,
+            onSelectHighlight = actions::onSelectHighlight,
+        )
+    }
+
+    if (state.showChangeSourceSheet && currentBook != null) {
+        InkChangeSourceSheet(
+            book = currentBook,
+            onDismiss = actions::onCloseChangeSource,
+            onSwitchSource = actions::onSwitchSource,
+        )
+    }
+
+    if (state.showReadAloudSheet) {
+        InkReadAloudSheet(
+            onDismiss = actions::onCloseReadAloud,
+            onOpenEngineDialog = actions::onOpenSpeakEngineDialog,
+        )
+    }
+
+    if (state.showMoreTypographySheet) {
+        InkMoreTypographySheet(
+            book = currentBook,
+            onDismiss = actions::onCloseMoreTypography,
+            onTypographyChanged = actions::onTypographyChanged,
+            onParagraphModeChanged = actions::onParagraphModeChanged,
+            onToggleAutoPage = actions::onToggleAutoPage,
+            onOpenLegacyMore = actions::onOpenLegacyMoreConfig,
+        )
     }
 }
 

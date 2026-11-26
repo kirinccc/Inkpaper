@@ -40,6 +40,7 @@ import io.legado.app.inkpaper.design.InkTheme
 import io.legado.app.inkpaper.ui.bookdetail.InkBookDetailScreen
 import io.legado.app.inkpaper.ui.bookshelf.InkBookshelfScreen
 import io.legado.app.inkpaper.ui.discover.InkDiscoverScreen
+import io.legado.app.inkpaper.ui.discover.InkExploreBooksScreen
 import io.legado.app.inkpaper.ui.me.InkMeScreen
 import io.legado.app.inkpaper.ui.search.InkSearchScreen
 
@@ -49,8 +50,10 @@ private object InkRoute {
     const val ME = "me"
     const val SEARCH = "search"
     const val BOOK_DETAIL = "book_detail/{bookKey}"
+    const val EXPLORE = "explore/{sourceKey}"
 
     fun bookDetail(bookUrl: String): String = "book_detail/${InkNavCache.encodeKey(bookUrl)}"
+    fun explore(sourceUrl: String): String = "explore/${InkNavCache.encodeKey(sourceUrl)}"
 }
 
 private data class InkTabItem(
@@ -119,6 +122,9 @@ fun InkAppRoot(
             composable(InkRoute.DISCOVER) {
                 InkDiscoverScreen(
                     onOpenSearch = { navController.navigate(InkRoute.SEARCH) },
+                    onOpenExplore = { sourceUrl ->
+                        navController.navigate(InkRoute.explore(sourceUrl))
+                    },
                 )
             }
             composable(InkRoute.ME) {
@@ -142,6 +148,21 @@ fun InkAppRoot(
                 InkBookDetailScreen(
                     bookKey = bookUrl,
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = InkRoute.EXPLORE,
+                arguments = listOf(navArgument("sourceKey") { type = NavType.StringType }),
+            ) { entry ->
+                val encoded = entry.arguments?.getString("sourceKey").orEmpty()
+                val sourceUrl = InkNavCache.decodeKey(encoded)
+                InkExploreBooksScreen(
+                    sourceUrl = sourceUrl,
+                    onBack = { navController.popBackStack() },
+                    onSelectBook = { searchBook ->
+                        InkNavCache.putSearchBook(searchBook)
+                        navController.navigate(InkRoute.bookDetail(searchBook.bookUrl))
+                    },
                 )
             }
         }

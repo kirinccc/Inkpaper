@@ -25,6 +25,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,20 +41,27 @@ import io.legado.app.inkpaper.design.InkCardGroup
 import io.legado.app.inkpaper.design.InkEmptyState
 import io.legado.app.inkpaper.design.InkListRow
 import io.legado.app.inkpaper.design.InkPageHeader
+import io.legado.app.inkpaper.design.InkSegmentedControl
 import io.legado.app.inkpaper.design.InkTheme
-import io.legado.app.ui.book.explore.ExploreShowActivity
 import io.legado.app.ui.book.source.manage.BookSourceActivity
+import io.legado.app.ui.rss.article.RssSortActivity
+import io.legado.app.ui.rss.read.ReadRssActivity
 import io.legado.app.ui.rss.source.manage.RssSourceActivity
 
 @Composable
 fun InkDiscoverScreen(
     onOpenSearch: () -> Unit,
+    onOpenExplore: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = InkTheme.colors
     val context = LocalContext.current
     val exploreSources by appDb.bookSourceDao.flowExplore()
         .collectAsStateWithLifecycle(initialValue = emptyList())
+    val rssSources by appDb.rssSourceDao.flowEnabled()
+        .collectAsStateWithLifecycle(initialValue = emptyList())
+
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     Column(
         modifier = modifier
@@ -62,7 +72,7 @@ fun InkDiscoverScreen(
 
         LazyColumn(
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
             item {
@@ -91,121 +101,179 @@ fun InkDiscoverScreen(
             }
 
             item {
-                InkCardGroup {
-                    InkListRow(
-                        title = "RSS 订阅",
-                        subtitle = "管理与浏览订阅源",
-                        leading = {
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(colors.chip),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.RssFeed,
-                                    contentDescription = null,
-                                    tint = colors.ink,
-                                    modifier = Modifier.size(18.dp),
+                InkSegmentedControl(
+                    options = listOf("书源发现", "RSS 订阅"),
+                    selectedIndex = selectedTab,
+                    onSelect = { selectedTab = it },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            if (selectedTab == 0) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "可用发现 (${exploreSources.size})",
+                            color = colors.ink,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = "管理 ›",
+                            color = colors.inkSecondary,
+                            fontSize = 12.5.sp,
+                            modifier = Modifier.clickable {
+                                context.startActivity(Intent(context, BookSourceActivity::class.java))
+                            },
+                        )
+                    }
+                }
+
+                if (exploreSources.isEmpty()) {
+                    item {
+                        InkEmptyState(
+                            title = "暂无可发现书源",
+                            subtitle = "请在书源管理中导入或启用支持发现的书源",
+                            actionLabel = "前往书源管理",
+                            onAction = {
+                                context.startActivity(Intent(context, BookSourceActivity::class.java))
+                            },
+                        )
+                    }
+                } else {
+                    item {
+                        InkCardGroup {
+                            exploreSources.forEachIndexed { index, source ->
+                                InkListRow(
+                                    title = source.bookSourceName,
+                                    subtitle = source.bookSourceGroup?.takeIf { it.isNotBlank() },
+                                    leading = {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(34.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(colors.chip),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Explore,
+                                                contentDescription = null,
+                                                tint = colors.ink,
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                        }
+                                    },
+                                    trailing = {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                                            contentDescription = null,
+                                            tint = colors.inkSecondary,
+                                        )
+                                    },
+                                    showDivider = index < exploreSources.lastIndex,
+                                    onClick = { onOpenExplore(source.bookSourceUrl) },
                                 )
                             }
-                        },
-                        trailing = {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                                contentDescription = null,
-                                tint = colors.inkSecondary,
-                            )
-                        },
-                        showDivider = false,
-                        onClick = {
-                            context.startActivity(Intent(context, RssSourceActivity::class.java))
-                        },
-                    )
-                }
-            }
-
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "书源发现",
-                        color = colors.ink,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = "管理 ›",
-                        color = colors.inkSecondary,
-                        fontSize = 12.5.sp,
-                        modifier = Modifier.clickable {
-                            context.startActivity(Intent(context, BookSourceActivity::class.java))
-                        },
-                    )
-                }
-            }
-
-            if (exploreSources.isEmpty()) {
-                item {
-                    InkEmptyState(
-                        title = "暂无可发现书源",
-                        subtitle = "请在书源管理中导入或启用支持发现的书源",
-                        actionLabel = "前往书源管理",
-                        onAction = {
-                            context.startActivity(Intent(context, BookSourceActivity::class.java))
-                        },
-                    )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 }
             } else {
                 item {
-                    InkCardGroup {
-                        exploreSources.forEachIndexed { index, source ->
-                            InkListRow(
-                                title = source.bookSourceName,
-                                subtitle = source.bookSourceGroup?.takeIf { it.isNotBlank() },
-                                leading = {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(34.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(colors.chip),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Explore,
-                                            contentDescription = null,
-                                            tint = colors.ink,
-                                            modifier = Modifier.size(18.dp),
-                                        )
-                                    }
-                                },
-                                trailing = {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                                        contentDescription = null,
-                                        tint = colors.inkSecondary,
-                                    )
-                                },
-                                showDivider = index < exploreSources.lastIndex,
-                                onClick = {
-                                    context.startActivity(
-                                        Intent(context, ExploreShowActivity::class.java).apply {
-                                            putExtra("sourceUrl", source.bookSourceUrl)
-                                            putExtra("exploreName", source.bookSourceName)
-                                            putExtra("showExploreCategories", true)
-                                        },
-                                    )
-                                },
-                            )
-                        }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "已启用订阅 (${rssSources.size})",
+                            color = colors.ink,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = "管理 ›",
+                            color = colors.inkSecondary,
+                            fontSize = 12.5.sp,
+                            modifier = Modifier.clickable {
+                                context.startActivity(Intent(context, RssSourceActivity::class.java))
+                            },
+                        )
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                if (rssSources.isEmpty()) {
+                    item {
+                        InkEmptyState(
+                            title = "暂无启用的订阅源",
+                            subtitle = "点击右上角管理导入或启用 RSS 订阅源",
+                            actionLabel = "前往订阅管理",
+                            onAction = {
+                                context.startActivity(Intent(context, RssSourceActivity::class.java))
+                            },
+                        )
+                    }
+                } else {
+                    item {
+                        InkCardGroup {
+                            rssSources.forEachIndexed { index, rss ->
+                                InkListRow(
+                                    title = rss.sourceName,
+                                    subtitle = rss.sourceGroup?.takeIf { it.isNotBlank() },
+                                    leading = {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(34.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(colors.chip),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.RssFeed,
+                                                contentDescription = null,
+                                                tint = colors.ink,
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                        }
+                                    },
+                                    trailing = {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                                            contentDescription = null,
+                                            tint = colors.inkSecondary,
+                                        )
+                                    },
+                                    showDivider = index < rssSources.lastIndex,
+                                    onClick = {
+                                        if (rss.singleUrl) {
+                                            ReadRssActivity.start(
+                                                context,
+                                                true,
+                                                rss.sourceUrl,
+                                                rss.sourceName,
+                                                rss.sourceUrl,
+                                            )
+                                        } else {
+                                            context.startActivity(
+                                                Intent(context, RssSortActivity::class.java).apply {
+                                                    putExtra("sourceUrl", rss.sourceUrl)
+                                                },
+                                            )
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 }
             }
         }
