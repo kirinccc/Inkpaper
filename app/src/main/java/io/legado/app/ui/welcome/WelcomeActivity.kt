@@ -65,8 +65,8 @@ open class WelcomeActivity : BaseActivity<ActivityWelcomeBinding>() {
                 }
             }
         }
-        binding.ivBook.setColorFilter(accentColor)
-        binding.vwTitleLine.setBackgroundColor(accentColor)
+        binding.ivBook.clearColorFilter()
+        binding.vwTitleLine.setBackgroundColor(android.graphics.Color.parseColor("#1B1B18"))
     }
 
     override fun setupSystemBar() {

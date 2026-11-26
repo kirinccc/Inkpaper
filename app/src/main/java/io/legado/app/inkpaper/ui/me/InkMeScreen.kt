@@ -1,6 +1,5 @@
 package io.legado.app.inkpaper.ui.me
 
-import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,13 +26,10 @@ import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.FileOpen
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Source
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,7 +39,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -59,32 +53,23 @@ import io.legado.app.inkpaper.design.InkTheme
 import io.legado.app.inkpaper.design.InkThemeController
 import io.legado.app.inkpaper.design.InkThemePreset
 import io.legado.app.inkpaper.design.toColors
-import androidx.compose.material.icons.outlined.Tune
 import io.legado.app.inkpaper.ui.settings.InkLocalImportSheet
-import io.legado.app.ui.about.AboutActivity
-import io.legado.app.ui.about.ReadRecordActivity
-import io.legado.app.ui.autoTask.AutoTaskActivity
-import io.legado.app.ui.book.bookmark.AllBookmarkActivity
-import io.legado.app.ui.book.toc.rule.TxtTocRuleActivity
-import io.legado.app.ui.config.ConfigActivity
-import io.legado.app.ui.config.ConfigTag
-import io.legado.app.ui.dict.rule.DictRuleActivity
-import io.legado.app.ui.rss.source.manage.RssSourceActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InkMeScreen(
     onOpenReadHabits: () -> Unit,
     onOpenBookSources: () -> Unit,
     onOpenReplaceRules: () -> Unit,
     onOpenBackup: () -> Unit,
+    onOpenReadRecords: () -> Unit,
+    onOpenAllBookmarks: () -> Unit,
+    onOpenAdvancedTools: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = InkTheme.colors
-    val serifFont = InkTheme.serifFont
-    val context = LocalContext.current
     val uiPrefs by InkThemeController.prefs.collectAsStateWithLifecycle()
 
     val shelfBooks by appDb.bookDao.flowAll().collectAsStateWithLifecycle(initialValue = emptyList())
@@ -94,10 +79,9 @@ fun InkMeScreen(
             runCatching { appDb.readRecordDao.all.sumOf { it.readTime } }.getOrDefault(0L)
         }
         val hours = ms / 3_600_000.0
-        value = if (hours >= 10) hours.toInt().toString() else String.format("%.1f", hours)
+        value = if (hours >= 10) hours.toInt().toString() else String.format(Locale.getDefault(), "%.1f", hours)
     }
 
-    var showAdvancedSheet by remember { mutableStateOf(false) }
     var showLocalImportSheet by remember { mutableStateOf(false) }
 
     Column(
@@ -285,20 +269,20 @@ fun InkMeScreen(
                         trailing = {
                             Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = colors.inkSecondary)
                         },
-                        onClick = { context.startActivity(Intent(context, ReadRecordActivity::class.java)) },
+                        onClick = onOpenReadRecords,
                     )
                     InkListRow(
-                        title = "全部书签",
+                        title = "书签与笔记",
                         leading = {
                             Icon(Icons.Outlined.Bookmarks, contentDescription = null, tint = colors.inkSecondary, modifier = Modifier.size(20.dp))
                         },
                         trailing = {
                             Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = colors.inkSecondary)
                         },
-                        onClick = { context.startActivity(Intent(context, AllBookmarkActivity::class.java)) },
+                        onClick = onOpenAllBookmarks,
                     )
                     InkListRow(
-                        title = "高级工具与更多设置",
+                        title = "高级工具与关于",
                         leading = {
                             Icon(Icons.Outlined.Build, contentDescription = null, tint = colors.inkSecondary, modifier = Modifier.size(20.dp))
                         },
@@ -306,7 +290,7 @@ fun InkMeScreen(
                             Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = colors.inkSecondary)
                         },
                         showDivider = false,
-                        onClick = { showAdvancedSheet = true },
+                        onClick = onOpenAdvancedTools,
                     )
                 }
             }
@@ -315,73 +299,6 @@ fun InkMeScreen(
 
     if (showLocalImportSheet) {
         InkLocalImportSheet(onDismiss = { showLocalImportSheet = false })
-    }
-
-    if (showAdvancedSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showAdvancedSheet = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = colors.surface,
-            contentColor = colors.ink,
-        ) {
-            Column(modifier = Modifier.padding(bottom = 24.dp)) {
-                Text(
-                    text = "高级工具与设置",
-                    color = colors.ink,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
-                )
-                HorizontalDivider(thickness = 0.5.dp, color = colors.line)
-                InkListRow(
-                    title = "TXT 目录规则",
-                    onClick = {
-                        showAdvancedSheet = false
-                        context.startActivity(Intent(context, TxtTocRuleActivity::class.java))
-                    },
-                )
-                InkListRow(
-                    title = "字典规则",
-                    onClick = {
-                        showAdvancedSheet = false
-                        context.startActivity(Intent(context, DictRuleActivity::class.java))
-                    },
-                )
-                InkListRow(
-                    title = "自动任务",
-                    onClick = {
-                        showAdvancedSheet = false
-                        context.startActivity(Intent(context, AutoTaskActivity::class.java))
-                    },
-                )
-                InkListRow(
-                    title = "RSS 源管理",
-                    onClick = {
-                        showAdvancedSheet = false
-                        context.startActivity(Intent(context, RssSourceActivity::class.java))
-                    },
-                )
-                InkListRow(
-                    title = "其他设置",
-                    onClick = {
-                        showAdvancedSheet = false
-                        context.startActivity(
-                            Intent(context, ConfigActivity::class.java).apply {
-                                putExtra("configTag", ConfigTag.OTHER_CONFIG)
-                            },
-                        )
-                    },
-                )
-                InkListRow(
-                    title = "关于阅读",
-                    showDivider = false,
-                    onClick = {
-                        showAdvancedSheet = false
-                        context.startActivity(Intent(context, AboutActivity::class.java))
-                    },
-                )
-            }
-        }
     }
 }
 

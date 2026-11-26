@@ -1,6 +1,6 @@
 <resources>
     <!--App-->
-    <string name="app_name">閲讀</string>
+    <string name="app_name">InkPaper</string>
     <string name="app_name_a">閲讀·A</string>
     <string name="receiving_shared_label">閲讀·搜尋</string>
     <string name="receiving_shared_import_label">閲讀·導入</string>

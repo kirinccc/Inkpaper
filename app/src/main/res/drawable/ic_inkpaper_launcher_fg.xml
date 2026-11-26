@@ -1,0 +1,28 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Minimalist open-book & paper-ink glyph centered inside 66dp adaptive safe zone -->
+    <path
+        android:fillColor="#1B1B18"
+        android:pathData="M31,36C31,34.34 32.34,33 34,33H50.5C52.16,33 53.5,34.34 53.5,36V73.5C51.2,71.9 48.2,71 45,71H34C32.34,71 31,69.66 31,68V36Z" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54.5,36C54.5,34.34 55.84,33 57.5,33H74C75.66,33 77,34.34 77,36V68C77,69.66 75.66,71 74,71H63C59.8,71 56.8,71.9 54.5,73.5V36Z"
+        android:strokeColor="#1B1B18"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="3.2" />
+    <!-- Subtle ink lines on right page -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M61,44H70M61,52H70M61,60H67"
+        android:strokeColor="#1B1B18"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.6" />
+    <!-- Minimalist bookmark notch on left ink page -->
+    <path
+        android:fillColor="#F7F6F3"
+        android:pathData="M38,33H44V49L41,46.2L38,49V33Z" />
+</vector>

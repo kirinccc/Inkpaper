@@ -1,5 +1,10 @@
 package io.legado.app.inkpaper.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -41,7 +46,10 @@ import io.legado.app.inkpaper.ui.bookdetail.InkBookDetailScreen
 import io.legado.app.inkpaper.ui.bookshelf.InkBookshelfScreen
 import io.legado.app.inkpaper.ui.discover.InkDiscoverScreen
 import io.legado.app.inkpaper.ui.discover.InkExploreBooksScreen
+import io.legado.app.inkpaper.ui.me.InkAdvancedToolsScreen
+import io.legado.app.inkpaper.ui.me.InkAllBookmarksScreen
 import io.legado.app.inkpaper.ui.me.InkMeScreen
+import io.legado.app.inkpaper.ui.me.InkReadRecordsScreen
 import io.legado.app.inkpaper.ui.search.InkSearchScreen
 import io.legado.app.inkpaper.ui.settings.InkBackupScreen
 import io.legado.app.inkpaper.ui.settings.InkReadHabitsScreen
@@ -59,6 +67,9 @@ private object InkRoute {
     const val REPLACE_RULES = "replace_rules"
     const val BACKUP = "backup"
     const val READ_HABITS = "read_habits"
+    const val READ_RECORDS = "read_records"
+    const val ALL_BOOKMARKS = "all_bookmarks"
+    const val ADVANCED_TOOLS = "advanced_tools"
 
     fun bookDetail(bookUrl: String): String = "book_detail/${InkNavCache.encodeKey(bookUrl)}"
     fun explore(sourceUrl: String): String = "explore/${InkNavCache.encodeKey(sourceUrl)}"
@@ -114,6 +125,18 @@ fun InkAppRoot(
         NavHost(
             navController = navController,
             startDestination = InkRoute.BOOKSHELF,
+            enterTransition = {
+                fadeIn(tween(200)) + slideInHorizontally(tween(220)) { it / 14 }
+            },
+            exitTransition = {
+                fadeOut(tween(160))
+            },
+            popEnterTransition = {
+                fadeIn(tween(200))
+            },
+            popExitTransition = {
+                fadeOut(tween(180)) + slideOutHorizontally(tween(200)) { it / 14 }
+            },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(bottom = innerPadding.calculateBottomPadding()),
@@ -143,6 +166,9 @@ fun InkAppRoot(
                     onOpenBookSources = { navController.navigate(InkRoute.BOOK_SOURCES) },
                     onOpenReplaceRules = { navController.navigate(InkRoute.REPLACE_RULES) },
                     onOpenBackup = { navController.navigate(InkRoute.BACKUP) },
+                    onOpenReadRecords = { navController.navigate(InkRoute.READ_RECORDS) },
+                    onOpenAllBookmarks = { navController.navigate(InkRoute.ALL_BOOKMARKS) },
+                    onOpenAdvancedTools = { navController.navigate(InkRoute.ADVANCED_TOOLS) },
                 )
             }
             composable(InkRoute.SEARCH) {
@@ -191,6 +217,15 @@ fun InkAppRoot(
             }
             composable(InkRoute.READ_HABITS) {
                 InkReadHabitsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(InkRoute.READ_RECORDS) {
+                InkReadRecordsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(InkRoute.ALL_BOOKMARKS) {
+                InkAllBookmarksScreen(onBack = { navController.popBackStack() })
+            }
+            composable(InkRoute.ADVANCED_TOOLS) {
+                InkAdvancedToolsScreen(onBack = { navController.popBackStack() })
             }
         }
     }
