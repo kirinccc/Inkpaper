@@ -30,6 +30,7 @@ import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.MoreHoriz
@@ -66,6 +67,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorInt
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.legado.app.constant.PageAnim
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
@@ -80,6 +82,7 @@ import io.legado.app.inkpaper.design.InkListRow
 import io.legado.app.inkpaper.design.InkSegmentedControl
 import io.legado.app.inkpaper.design.InkSwitch
 import io.legado.app.inkpaper.design.InkTheme
+import io.legado.app.inkpaper.tts.BreezePlaybackTracker
 import io.legado.app.model.ReadBook
 import kotlin.math.roundToInt
 
@@ -119,6 +122,8 @@ interface InkReaderActions {
     fun onOpenAloud()
     fun onCloseReadAloud()
     fun onOpenSpeakEngineDialog()
+    fun onOpenReaderMenuFromAloud()
+    fun onBackToSpeechPosition()
     fun onToggleNight()
     fun onOpenQuickSettings()
     fun onCloseQuickSettings()
@@ -725,10 +730,54 @@ fun InkReaderOverlay(
         )
     }
 
+    val breezeStatus by BreezePlaybackTracker.status.collectAsStateWithLifecycle()
+    if (!state.hasAnyVisibleLayer && breezeStatus.isRunning && breezeStatus.speaker.isNotBlank()) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(top = 12.dp, end = 14.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = actions::onOpenAloud),
+                shape = CircleShape,
+                color = colors.surface.copy(alpha = 0.92f),
+                border = BorderStroke(0.5.dp, colors.line),
+                shadowElevation = 1.dp,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.GraphicEq,
+                        contentDescription = null,
+                        tint = colors.ink,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Text(
+                        text = if (breezeStatus.isBuffering) {
+                            "${breezeStatus.speaker} · 缓冲"
+                        } else {
+                            breezeStatus.speaker
+                        },
+                        color = colors.ink,
+                        fontSize = 11.5.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+
     if (state.showReadAloudSheet) {
         InkReadAloudSheet(
             onDismiss = actions::onCloseReadAloud,
             onOpenEngineDialog = actions::onOpenSpeakEngineDialog,
+            onOpenReaderMenu = actions::onOpenReaderMenuFromAloud,
+            onBackToSpeechPosition = actions::onBackToSpeechPosition,
         )
     }
 

@@ -24,6 +24,7 @@ import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.SourceSharePassphrase
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.source.clearSharedGlobalState
+import io.legado.app.inkpaper.tts.BreezeTtsConfig
 import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.sourceSharePassphraseButton
@@ -138,6 +139,20 @@ class SpeakEngineDialog() : BaseDialogFragment(R.layout.dialog_recycler_view),
                     .getOrNull()?.value.isNullOrEmpty()
                 cbName.setOnClickListener {
                     upTts(GSON.toJson(SelectItem("系统默认", "")))
+                }
+            }
+        }
+        adapter.addHeaderView {
+            ItemHttpTtsBinding.inflate(layoutInflater, recyclerView, false).apply {
+                sysTtsViews.add(cbName)
+                ivEdit.gone()
+                ivMenuDelete.gone()
+                labelSys.visible()
+                cbName.text = BreezeTtsConfig.ENGINE_DISPLAY_NAME
+                cbName.tag = BreezeTtsConfig.ENGINE_ID
+                cbName.isChecked = ttsEngine == BreezeTtsConfig.ENGINE_ID
+                cbName.setOnClickListener {
+                    upTts(BreezeTtsConfig.ENGINE_ID)
                 }
             }
         }

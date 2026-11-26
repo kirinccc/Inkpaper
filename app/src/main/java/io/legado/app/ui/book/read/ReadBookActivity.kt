@@ -3618,6 +3618,20 @@ class ReadBookActivity : BaseReadBookActivity(),
             showDialogFragment<SpeakEngineDialog>()
         }
 
+        override fun onOpenReaderMenuFromAloud() {
+            inkOverlayState.value = inkOverlayState.value.copy(
+                visible = true,
+                showReadAloudSheet = false,
+            )
+            syncInkOverlayState(visible = true)
+            onMenuShow()
+            upSystemUiVisibility()
+        }
+
+        override fun onBackToSpeechPosition() {
+            backToSpeakingPosition()
+        }
+
         override fun onToggleNight() {
             val nextNight = !inkOverlayState.value.isNight
             if (nextNight) {

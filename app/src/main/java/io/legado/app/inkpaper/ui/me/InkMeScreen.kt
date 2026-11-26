@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.FileOpen
+import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Source
 import androidx.compose.material.icons.outlined.Tune
@@ -53,6 +54,8 @@ import io.legado.app.inkpaper.design.InkTheme
 import io.legado.app.inkpaper.design.InkThemeController
 import io.legado.app.inkpaper.design.InkThemePreset
 import io.legado.app.inkpaper.design.toColors
+import io.legado.app.inkpaper.tts.BreezeTtsConfig
+import io.legado.app.inkpaper.ui.reader.InkBreezeConfigSheet
 import io.legado.app.inkpaper.ui.settings.InkLocalImportSheet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -83,6 +86,7 @@ fun InkMeScreen(
     }
 
     var showLocalImportSheet by remember { mutableStateOf(false) }
+    var showBreezeConfigSheet by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -206,8 +210,23 @@ fun InkMeScreen(
                         trailing = {
                             Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = colors.inkSecondary)
                         },
-                        showDivider = false,
                         onClick = onOpenReadHabits,
+                    )
+                    InkListRow(
+                        title = "Breeze AI 有声书",
+                        subtitle = if (BreezeTtsConfig.hasApiKey()) {
+                            "${BreezeTtsConfig.dramaMode.label} · 多角色演播"
+                        } else {
+                            "配置 Breeze API Key 与多角色声优"
+                        },
+                        leading = {
+                            Icon(Icons.Outlined.GraphicEq, contentDescription = null, tint = colors.inkSecondary, modifier = Modifier.size(20.dp))
+                        },
+                        trailing = {
+                            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = colors.inkSecondary)
+                        },
+                        showDivider = false,
+                        onClick = { showBreezeConfigSheet = true },
                     )
                 }
             }
@@ -299,6 +318,9 @@ fun InkMeScreen(
 
     if (showLocalImportSheet) {
         InkLocalImportSheet(onDismiss = { showLocalImportSheet = false })
+    }
+    if (showBreezeConfigSheet) {
+        InkBreezeConfigSheet(onDismiss = { showBreezeConfigSheet = false })
     }
 }
 

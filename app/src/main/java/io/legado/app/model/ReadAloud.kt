@@ -10,8 +10,10 @@ import io.legado.app.constant.IntentAction
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.HttpTTS
 import io.legado.app.help.config.AppConfig
+import io.legado.app.inkpaper.tts.BreezeTtsConfig
 import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.service.BaseReadAloudService
+import io.legado.app.service.BreezeReadAloudService
 import io.legado.app.service.HttpReadAloudService
 import io.legado.app.service.TTSReadAloudService
 import io.legado.app.utils.GSON
@@ -41,6 +43,9 @@ internal fun resolveReadAloudEngineName(
     httpTtsName: (Long) -> String?,
 ): String {
     val engine = ttsEngine?.takeIf { it.isNotBlank() } ?: return systemTtsName
+    if (engine == BreezeTtsConfig.ENGINE_ID) {
+        return BreezeTtsConfig.ENGINE_DISPLAY_NAME
+    }
     engine.toLongOrNull()?.let { id ->
         return httpTtsName(id)?.takeIf { it.isNotBlank() } ?: systemTtsName
     }
@@ -78,6 +83,9 @@ object ReadAloud {
         val ttsEngine = ttsEngine
         if (ttsEngine.isNullOrBlank()) {
             return TTSReadAloudService::class.java
+        }
+        if (ttsEngine == BreezeTtsConfig.ENGINE_ID) {
+            return BreezeReadAloudService::class.java
         }
         ttsEngine.toLongOrNull()?.let { id ->
             httpTTS = appDb.httpTTSDao.get(id)
