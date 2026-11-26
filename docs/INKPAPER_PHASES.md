@@ -57,3 +57,38 @@
   - `InkNavHost` 增加细腻的横向微滑入与淡入淡出页面转场；
   - 应用名称全语言统一为 **InkPaper**；
   - 更换极简黑白灰纸墨矢量自适应桌面图标（`ic_inkpaper_launcher_bg` / `ic_inkpaper_launcher_fg`）与素纸冷启动欢迎页。
+
+---
+
+## Phase 5：搜书覆盖率与书源治理（已完成）
+
+- **书源底座清洗与三层分组**：
+  - 新增 `tools/check_book_sources.py` 巡检脚本，剔除死站及已失效的未鉴权番茄 `api5` 接口源；
+  - 将 `bookSources.json` 重整为「精选默认启用 / 长尾备用 / 官方需登录」三层结构，并在 `DefaultData` / `LocalConfig` 补齐首次安装自动 Seed。
+- **搜索链路升级与改名书破局**：
+  - 放开 `InkSearchScreen` 分组范围筛选与精准匹配开关，接入 `InkSearchQueryHelper` 规范化清洗与零结果/少结果改搜建议胶囊；
+  - 详情页作者名支持点击直达该作者全部作品搜索；
+  - 零结果兜底支持一键启用备用源重搜、内置浏览器检索作者/曾用名，以及通过 `InkAddBookUrlSheet` 粘贴书籍网址或 19 位番茄 `book_id` 直达解析。
+- **书源治理闭环**：
+  - `InkBookSourcesScreen` 接入 `CheckSource` 批量校验、失效源一键禁用、需登录标识与 `SourceLoginActivity` 入口，以及基于 `RuleSub` 的远程书源订阅管理。
+
+---
+
+## Phase 6：跨改名换源、假活源治理与订阅自动刷新（已完成）
+
+- **假活源与空返回源深度清理**：
+  - 升级 `tools/check_book_sources.py` 自动识别域名停放跳转、短 JS 重定向、`[api]` 返回 HTML 首页等假活源，以及热门词空列表响应，进一步净化 `bookSources.json`。
+- **跨改名书换源与详情页换源**：
+  - `InkChangeSourceSheet` 接入智能书名/作者匹配，新增「按作者找改名源」模式并在候选结果中标注站内旧书名；
+  - `InkBookDetailScreen` / `InkBookDetailViewModel` 新增「切换书源」入口及空目录快捷换源，换源时自动继承阅读进度与书架状态。
+- **剪贴板感知、书架直达入口与自动订阅刷新**：
+  - 抽取公共 `InkBookUrlResolver` 并在书架「更多」菜单接入「链接 / 番茄 ID 加书」，`InkAddBookUrlSheet` 支持自动识别剪贴板链接/19 位 ID 一键填入；
+  - `DefaultData.syncAutoUpdateBookSourceSubs()` 接入 `App` 启动后台协程，按订阅间隔静默增量刷新已开启自动更新的书源订阅。
+
+---
+
+## Phase 7：搜书体验收口与打包验收（已完成）
+
+- **内置浏览器回搜与直达加书**：`WebViewActivity` 新增「用选中文字搜书」与「用当前网址加书」菜单项，从搜索页拉起外部查书后可一键带回作者/旧书名重搜或直接解析入架。
+- **老用户书源一键重置**：`DefaultData` 新增 `resetToDefaultBookSources()`，并在 `InkBookSourcesScreen` 批量菜单提供「重置为内置精选书源（清空旧源）」。
+- **搜书分组记忆与免费源优先级**：`LocalConfig.lastSearchGroup` 持久化记忆上次选中的搜书分组；重整 `bookSources.json` 的 `weight` 与 `customOrder` 权重层级，并在 `InkChangeSourceSheet` 按 `originOrder` 优先展示免费精选源。

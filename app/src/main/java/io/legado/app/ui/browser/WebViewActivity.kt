@@ -1,6 +1,7 @@
 package io.legado.app.ui.browser
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
 import android.net.Uri
@@ -31,9 +32,11 @@ import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.accentColor
+import io.legado.app.ui.association.AddToBookshelfDialog
 import io.legado.app.ui.association.OnLineImportActivity
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.utils.ACache
+import io.legado.app.utils.GSON
 import io.legado.app.utils.gone
 import io.legado.app.utils.invisible
 import io.legado.app.utils.keepScreenOn
@@ -41,7 +44,9 @@ import io.legado.app.utils.longSnackbar
 import io.legado.app.utils.openUrl
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setOnApplyWindowInsetsListenerCompat
+import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
+import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.toggleSystemBar
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.legado.app.utils.visible
@@ -201,6 +206,8 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
             menu.findItem(R.id.menu_disable_source)?.isVisible = true
             menu.findItem(R.id.menu_delete_source)?.isVisible = true
         }
+        menu.findItem(R.id.menu_search_selection)?.isVisible =
+            intent.getBooleanExtra("enableSearchReturn", false)
         menu.findItem(R.id.menu_show_web_log)?.isChecked = sessionShowWebLog
         return super.onPrepareOptionsMenu(menu)
     }
@@ -209,7 +216,30 @@ class WebViewActivity : VMBaseActivity<ActivityWebViewBinding, WebViewModel>() {
         when (item.itemId) {
             R.id.menu_web_refresh -> refresh()
             R.id.menu_open_in_browser -> openUrl(viewModel.baseUrl)
-            R.id.menu_copy_url -> sendToClip(viewModel.baseUrl)
+            R.id.menu_copy_url -> sendToClip(currentWebView.url?.takeIf { it.isNotBlank() } ?: viewModel.baseUrl)
+            R.id.menu_search_selection -> {
+                currentWebView.evaluateJavascript("(function(){return window.getSelection().toString();})()") { raw ->
+                    val decoded = runCatching {
+                        GSON.fromJson(raw, String::class.java)
+                    }.getOrNull() ?: raw.orEmpty().trim().trim('"')
+                    val selected = decoded.trim()
+                    if (selected.isEmpty()) {
+                        toastOnUi("请先在网页中长按选中作者名或旧书名")
+                    } else {
+                        setResult(RESULT_OK, Intent().putExtra("searchQuery", selected))
+                        finish()
+                    }
+                }
+            }
+            R.id.menu_add_url_to_bookshelf -> {
+                val targetUrl = currentWebView.url?.takeIf { it.isNotBlank() } ?: viewModel.baseUrl
+                if (intent.getBooleanExtra("enableSearchReturn", false)) {
+                    setResult(RESULT_OK, Intent().putExtra("bookUrl", targetUrl))
+                    finish()
+                } else {
+                    showDialogFragment(AddToBookshelfDialog(targetUrl))
+                }
+            }
             R.id.menu_ok -> {
                 if (viewModel.sourceVerificationEnable) {
                     viewModel.saveVerificationResult(currentWebView) {

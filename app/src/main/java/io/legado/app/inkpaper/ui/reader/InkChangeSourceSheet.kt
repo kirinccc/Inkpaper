@@ -49,7 +49,9 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.inkpaper.design.InkEmptyState
+import io.legado.app.inkpaper.design.InkFilterChip
 import io.legado.app.inkpaper.design.InkTheme
+import io.legado.app.inkpaper.ui.search.InkSearchQueryHelper
 import io.legado.app.model.webBook.WebBook
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -72,25 +74,34 @@ fun InkChangeSourceSheet(
     val scope = rememberCoroutineScope()
     val results = remember { mutableStateListOf<SearchBook>() }
     var refreshKey by remember { mutableIntStateOf(0) }
+    var searchByAuthor by remember { mutableStateOf(false) }
     var isSearching by remember { mutableStateOf(true) }
     var searchedCount by remember { mutableIntStateOf(0) }
     var totalSources by remember { mutableIntStateOf(0) }
     var switchingUrl by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(book.bookUrl, refreshKey) {
+    LaunchedEffect(book.bookUrl, refreshKey, searchByAuthor) {
         isSearching = true
         errorMessage = null
         searchedCount = 0
         results.clear()
 
-        val cached = withContext(Dispatchers.IO) {
-            runCatching {
-                appDb.searchBookDao.changeSourceSearch(book.name, book.author, "", "")
-            }.getOrDefault(emptyList())
+        if (!searchByAuthor) {
+            val cached = withContext(Dispatchers.IO) {
+                runCatching {
+                    appDb.searchBookDao.changeSourceSearch(book.name, book.author, "", "")
+                }.getOrDefault(emptyList())
+            }
+            if (cached.isNotEmpty()) {
+                results.addAll(cached.distinctBy { it.origin })
+            }
         }
-        if (cached.isNotEmpty()) {
-            results.addAll(cached.distinctBy { it.origin })
+
+        val queryWord = if (searchByAuthor && book.author.isNotBlank()) {
+            book.author.trim()
+        } else {
+            InkSearchQueryHelper.normalizeQuery(book.name)
         }
 
         val parts = withContext(Dispatchers.IO) {
@@ -107,12 +118,19 @@ fun InkChangeSourceSheet(
                             if (source != null) {
                                 val items = withTimeoutOrNull(15_000L) {
                                     runCatching {
-                                        WebBook.searchBookAwait(source, book.name, 1)
+                                        WebBook.searchBookAwait(source, queryWord, 1)
                                     }.getOrNull()
                                 }.orEmpty()
-                                val matched = items.filter {
-                                    it.name == book.name &&
-                                        (book.author.isBlank() || it.author.contains(book.author) || book.author.contains(it.author))
+                                val matched = if (searchByAuthor) {
+                                    items.filter {
+                                        it.author.isNotBlank() &&
+                                            InkSearchQueryHelper.isSameAuthor(it.author, book.author)
+                                    }
+                                } else {
+                                    items.filter {
+                                        InkSearchQueryHelper.isSameBookTitle(it.name, book.name) &&
+                                            InkSearchQueryHelper.isSameAuthor(it.author, book.author)
+                                    }
                                 }
                                 if (matched.isNotEmpty()) {
                                     matched.forEach { it.releaseHtmlData() }
@@ -125,6 +143,7 @@ fun InkChangeSourceSheet(
                                                 results.add(candidate)
                                             }
                                         }
+                                        results.sortBy { it.originOrder }
                                     }
                                 }
                             }
@@ -188,6 +207,26 @@ fun InkChangeSourceSheet(
                 }
             }
 
+            if (book.author.isNotBlank()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    InkFilterChip(
+                        text = "按书名匹配",
+                        selected = !searchByAuthor,
+                        onClick = { searchByAuthor = false },
+                    )
+                    InkFilterChip(
+                        text = "按作者找改名源（${book.author}）",
+                        selected = searchByAuthor,
+                        onClick = { searchByAuthor = true },
+                    )
+                }
+            }
+
             if (isSearching && totalSources > 0) {
                 LinearProgressIndicator(
                     progress = { (searchedCount.toFloat() / totalSources.toFloat()).coerceIn(0f, 1f) },
@@ -212,11 +251,18 @@ fun InkChangeSourceSheet(
 
             if (results.isEmpty() && !isSearching) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    val canTryAuthor = !searchByAuthor && book.author.isNotBlank()
                     InkEmptyState(
                         title = "未搜到其他书源",
-                        subtitle = "请检查启用的书源，或稍后重试",
-                        actionLabel = "重新搜源",
-                        onAction = { refreshKey += 1 },
+                        subtitle = if (canTryAuthor) "这本书可能在站外使用了旧书名，可尝试按作者检索" else "请检查启用的书源，或稍后重试",
+                        actionLabel = if (canTryAuthor) "按作者「${book.author}」搜改名源" else "重新搜源",
+                        onAction = {
+                            if (canTryAuthor) {
+                                searchByAuthor = true
+                            } else {
+                                refreshKey += 1
+                            }
+                        },
                     )
                 }
             } else {
@@ -284,10 +330,14 @@ fun InkChangeSourceSheet(
                                         )
                                     }
                                 }
-                                if (!item.latestChapterTitle.isNullOrBlank()) {
+                                val subParts = listOfNotNull(
+                                    if (!InkSearchQueryHelper.isSameBookTitle(item.name, book.name)) "站内名：《${item.name}》" else null,
+                                    item.latestChapterTitle?.takeIf { it.isNotBlank() }?.let { "最新：$it" },
+                                ).joinToString(" · ")
+                                if (subParts.isNotEmpty()) {
                                     Spacer(modifier = Modifier.height(3.dp))
                                     Text(
-                                        text = "最新：${item.latestChapterTitle}",
+                                        text = subParts,
                                         color = colors.inkSecondary,
                                         fontSize = 12.sp,
                                         maxLines = 1,

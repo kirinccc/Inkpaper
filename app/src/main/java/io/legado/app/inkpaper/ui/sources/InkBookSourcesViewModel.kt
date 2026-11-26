@@ -1,17 +1,22 @@
 package io.legado.app.inkpaper.ui.sources
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppPattern
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.BookSourceCheckState
 import io.legado.app.data.entities.BookSourcePart
+import io.legado.app.data.entities.RuleSub
+import io.legado.app.help.DefaultData
 import io.legado.app.help.http.decompressed
 import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.http.text
 import io.legado.app.help.source.SourceHelp
+import io.legado.app.model.CheckSource
 import io.legado.app.ui.association.BookSourceImportJson
 import io.legado.app.ui.association.parseBookSourceJson
 import io.legado.app.utils.isAbsUrl
@@ -41,8 +46,15 @@ class InkBookSourcesViewModel : ViewModel() {
     private val _isImporting = MutableStateFlow(false)
     val isImporting: StateFlow<Boolean> = _isImporting.asStateFlow()
 
+    private val _isSyncingSub = MutableStateFlow(false)
+    val isSyncingSub: StateFlow<Boolean> = _isSyncingSub.asStateFlow()
+
     private val _statusMessage = MutableStateFlow<String?>(null)
     val statusMessage: StateFlow<String?> = _statusMessage.asStateFlow()
+
+    val subscriptions: StateFlow<List<RuleSub>> = appDb.ruleSubDao.flowAll()
+        .map { list -> list.filter { it.type == 0 } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val allSources: StateFlow<List<BookSourcePart>> = appDb.bookSourceDao.flowAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -126,6 +138,114 @@ class InkBookSourcesViewModel : ViewModel() {
             } else {
                 "已禁用当前 ${current.size} 个书源"
             }
+        }
+    }
+
+    fun checkFilteredSources(context: Context) {
+        val targets = filteredSources.value
+        if (targets.isEmpty()) {
+            _statusMessage.value = "当前列表没有可校验的书源"
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                CheckSource.start(context, targets, System.currentTimeMillis())
+            }.onSuccess {
+                _statusMessage.value = "已启动 ${targets.size} 个书源校验，可在通知栏查看进度"
+            }.onFailure { err ->
+                _statusMessage.value = "启动校验失败：${err.localizedMessage ?: "未知错误"}"
+            }
+        }
+    }
+
+    fun disableFailedSources() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val failed = allSources.value.filter {
+                it.enabled && it.checkStatus == BookSourceCheckState.FAILED
+            }
+            if (failed.isEmpty()) {
+                _statusMessage.value = "暂无已启用的失效书源（请先执行书源校验）"
+                return@launch
+            }
+            appDb.bookSourceDao.enable(false, failed)
+            _statusMessage.value = "已禁用 ${failed.size} 个校验失效的书源"
+        }
+    }
+
+    fun syncBuiltinSources() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val count = DefaultData.importDefaultBookSources(overwriteExisting = true)
+            _statusMessage.value = "已同步内置精选书源（$count 个）"
+        }
+    }
+
+    fun resetToBuiltinSources() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val count = DefaultData.resetToDefaultBookSources()
+            _statusMessage.value = "已重置为内置精选书源（$count 个，已清理旧源）"
+        }
+    }
+
+    fun addSubscription(name: String, url: String) {
+        val cleanUrl = url.trim()
+        if (!cleanUrl.isAbsUrl()) {
+            _statusMessage.value = "订阅地址必须以 http:// 或 https:// 开头"
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            val existing = appDb.ruleSubDao.findByUrl(cleanUrl)
+            val sub = existing ?: RuleSub(
+                name = name.trim().ifBlank { cleanUrl.substringAfter("://").substringBefore("/") },
+                url = cleanUrl,
+                type = 0,
+                customOrder = appDb.ruleSubDao.maxOrder + 1,
+                autoUpdate = true,
+                silentUpdate = true,
+                update = 0L,
+            ).also { appDb.ruleSubDao.insert(it) }
+            syncSubscriptionInternal(sub)
+        }
+    }
+
+    fun syncSubscription(sub: RuleSub) {
+        viewModelScope.launch(Dispatchers.IO) {
+            syncSubscriptionInternal(sub)
+        }
+    }
+
+    private suspend fun syncSubscriptionInternal(sub: RuleSub) {
+        _isSyncingSub.value = true
+        runCatching {
+            val content = fetchUrlText(sub.url)
+            val parsed = parseBookSources(content)
+            if (parsed.isEmpty()) error("未解析到有效书源")
+            val toInsert = mutableListOf<BookSource>()
+            for (incoming in parsed) {
+                val local = appDb.bookSourceDao.getBookSourcePart(incoming.bookSourceUrl)
+                if (local == null || local.lastUpdateTime < incoming.lastUpdateTime) {
+                    if (local != null && !local.bookSourceGroup.isNullOrBlank()) {
+                        incoming.bookSourceGroup = local.bookSourceGroup
+                    }
+                    toInsert.add(incoming)
+                }
+            }
+            if (toInsert.isNotEmpty()) {
+                SourceHelp.insertBookSource(*toInsert.toTypedArray())
+            }
+            appDb.ruleSubDao.update(sub.copy(update = System.currentTimeMillis()))
+            parsed.size to toInsert.size
+        }.onSuccess { (total, updated) ->
+            _statusMessage.value = "订阅「${sub.name}」同步完成：解析 $total 个，更新/新增 $updated 个"
+        }.onFailure { err ->
+            _statusMessage.value = "订阅同步失败：${err.localizedMessage ?: "网络或格式错误"}"
+        }
+        _isSyncingSub.value = false
+    }
+
+    fun deleteSubscription(sub: RuleSub) {
+        viewModelScope.launch(Dispatchers.IO) {
+            appDb.ruleSubDao.delete(sub)
+            _statusMessage.value = "已删除订阅「${sub.name}」"
         }
     }
 

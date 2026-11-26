@@ -6,6 +6,7 @@ import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
+import io.legado.app.data.entities.BookSource
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isNotShelf
@@ -178,6 +179,59 @@ class InkBookDetailViewModel : ViewModel() {
             _uiState.update { it.copy(book = targetBook) }
             withContext(Dispatchers.Main) {
                 onReady(targetBook)
+            }
+        }
+    }
+
+    fun switchSource(
+        newSource: BookSource,
+        newBook: Book,
+        newChapters: List<BookChapter>,
+    ) {
+        val oldBook = _uiState.value.book ?: return
+        val inShelf = _uiState.value.inBookshelf
+        viewModelScope.launch(Dispatchers.IO) {
+            val coercedIndex = if (newChapters.isNotEmpty()) {
+                oldBook.durChapterIndex.coerceIn(0, newChapters.lastIndex)
+            } else {
+                0
+            }
+            val updatedBook = newBook.copy().apply {
+                origin = newSource.bookSourceUrl
+                originName = newSource.bookSourceName
+                durChapterIndex = coercedIndex
+                durChapterTitle = newChapters.getOrNull(coercedIndex)?.title ?: oldBook.durChapterTitle
+                durChapterPos = if (coercedIndex == oldBook.durChapterIndex) oldBook.durChapterPos else 0
+                order = oldBook.order
+                group = oldBook.group
+                canUpdate = oldBook.canUpdate
+                totalChapterNum = newChapters.size
+                latestChapterTitle = newChapters.lastOrNull()?.title ?: latestChapterTitle
+                if (inShelf) {
+                    removeType(BookType.notShelf)
+                } else {
+                    addType(BookType.notShelf)
+                }
+            }
+            if (inShelf) {
+                if (oldBook.bookUrl != updatedBook.bookUrl) {
+                    appDb.bookDao.delete(oldBook)
+                    appDb.bookChapterDao.delByBook(oldBook.bookUrl)
+                }
+                appDb.bookDao.insert(updatedBook)
+                if (newChapters.isNotEmpty()) {
+                    appDb.bookChapterDao.delByBook(updatedBook.bookUrl)
+                    appDb.bookChapterDao.insert(*newChapters.toTypedArray())
+                }
+            }
+            InkNavCache.putBook(updatedBook)
+            loadedKey = updatedBook.bookUrl
+            _uiState.update {
+                it.copy(
+                    book = updatedBook,
+                    chapters = newChapters,
+                    errorMessage = null,
+                )
             }
         }
     }

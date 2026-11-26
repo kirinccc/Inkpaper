@@ -60,7 +60,7 @@ private object InkRoute {
     const val BOOKSHELF = "bookshelf"
     const val DISCOVER = "discover"
     const val ME = "me"
-    const val SEARCH = "search"
+    const val SEARCH = "search?q={q}"
     const val BOOK_DETAIL = "book_detail/{bookKey}"
     const val EXPLORE = "explore/{sourceKey}"
     const val BOOK_SOURCES = "book_sources"
@@ -71,6 +71,8 @@ private object InkRoute {
     const val ALL_BOOKMARKS = "all_bookmarks"
     const val ADVANCED_TOOLS = "advanced_tools"
 
+    fun search(query: String? = null): String =
+        if (query.isNullOrBlank()) "search" else "search?q=${InkNavCache.encodeKey(query)}"
     fun bookDetail(bookUrl: String): String = "book_detail/${InkNavCache.encodeKey(bookUrl)}"
     fun explore(sourceUrl: String): String = "explore/${InkNavCache.encodeKey(sourceUrl)}"
 }
@@ -143,7 +145,7 @@ fun InkAppRoot(
         ) {
             composable(InkRoute.BOOKSHELF) {
                 InkBookshelfScreen(
-                    onOpenSearch = { navController.navigate(InkRoute.SEARCH) },
+                    onOpenSearch = { navController.navigate(InkRoute.search()) },
                     onOpenDetail = { book ->
                         InkNavCache.putBook(book)
                         navController.navigate(InkRoute.bookDetail(book.bookUrl))
@@ -153,7 +155,7 @@ fun InkAppRoot(
             }
             composable(InkRoute.DISCOVER) {
                 InkDiscoverScreen(
-                    onOpenSearch = { navController.navigate(InkRoute.SEARCH) },
+                    onOpenSearch = { navController.navigate(InkRoute.search()) },
                     onOpenExplore = { sourceUrl ->
                         navController.navigate(InkRoute.explore(sourceUrl))
                     },
@@ -171,12 +173,28 @@ fun InkAppRoot(
                     onOpenAdvancedTools = { navController.navigate(InkRoute.ADVANCED_TOOLS) },
                 )
             }
-            composable(InkRoute.SEARCH) {
+            composable(
+                route = InkRoute.SEARCH,
+                arguments = listOf(
+                    navArgument("q") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                ),
+            ) { entry ->
+                val rawQuery = entry.arguments?.getString("q").orEmpty()
+                val initialQuery = if (rawQuery.isBlank()) "" else InkNavCache.decodeKey(rawQuery)
                 InkSearchScreen(
                     onBack = { navController.popBackStack() },
                     onSelectResult = { searchBook ->
                         InkNavCache.putSearchBook(searchBook)
                         navController.navigate(InkRoute.bookDetail(searchBook.bookUrl))
+                    },
+                    initialQuery = initialQuery,
+                    onOpenBookSources = { navController.navigate(InkRoute.BOOK_SOURCES) },
+                    onBookAddedByUrl = { book ->
+                        InkNavCache.putBook(book)
+                        navController.navigate(InkRoute.bookDetail(book.bookUrl))
                     },
                 )
             }
@@ -189,6 +207,9 @@ fun InkAppRoot(
                 InkBookDetailScreen(
                     bookKey = bookUrl,
                     onBack = { navController.popBackStack() },
+                    onSearchAuthor = { author ->
+                        navController.navigate(InkRoute.search(author))
+                    },
                 )
             }
             composable(

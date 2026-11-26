@@ -25,6 +25,17 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_search_selection"
+        android:title="用选中文字搜书"
+        android:visible="false"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_add_url_to_bookshelf"
+        android:title="用当前网址加书"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_full_screen"
         android:title="@string/full_screen"
         app:showAsAction="never" />

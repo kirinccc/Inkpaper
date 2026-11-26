@@ -7,6 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -49,25 +51,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.legado.app.help.book.isLocal
 import io.legado.app.inkpaper.design.InkBookCover
 import io.legado.app.inkpaper.design.InkCardGroup
 import io.legado.app.inkpaper.design.InkEmptyState
 import io.legado.app.inkpaper.design.InkListRow
 import io.legado.app.inkpaper.design.InkSubTopBar
 import io.legado.app.inkpaper.design.InkTheme
+import io.legado.app.inkpaper.ui.reader.InkChangeSourceSheet
 import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.utils.startActivityForBook
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun InkBookDetailScreen(
     bookKey: String,
     onBack: () -> Unit,
+    onSearchAuthor: (String) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: InkBookDetailViewModel = viewModel(),
 ) {
@@ -78,6 +84,7 @@ fun InkBookDetailScreen(
 
     var expandIntro by remember { mutableStateOf(false) }
     var showTocSheet by remember { mutableStateOf(false) }
+    var showChangeSourceSheet by remember { mutableStateOf(false) }
     var reverseToc by remember { mutableStateOf(false) }
 
     LaunchedEffect(bookKey) {
@@ -161,18 +168,42 @@ fun InkBookDetailScreen(
                 textAlign = TextAlign.Center,
             )
             Spacer(modifier = Modifier.height(6.dp))
-            val meta = listOfNotNull(
-                book.author.takeIf { it.isNotBlank() },
+            val authorName = book.author.trim()
+            val extraMeta = listOfNotNull(
                 book.kind?.takeIf { it.isNotBlank() },
                 book.wordCount?.takeIf { it.isNotBlank() },
             ).joinToString(" · ")
-            if (meta.isNotEmpty()) {
-                Text(
-                    text = meta,
-                    color = colors.inkSecondary,
-                    fontSize = 13.sp,
-                    textAlign = TextAlign.Center,
-                )
+            if (authorName.isNotEmpty() || extraMeta.isNotEmpty()) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    if (authorName.isNotEmpty()) {
+                        Text(
+                            text = "$authorName ↗",
+                            color = colors.ink,
+                            fontSize = 13.sp,
+                            textDecoration = TextDecoration.Underline,
+                            modifier = Modifier.clickable { onSearchAuthor(authorName) },
+                        )
+                    }
+                    if (authorName.isNotEmpty() && extraMeta.isNotEmpty()) {
+                        Text(
+                            text = " · ",
+                            color = colors.inkSecondary,
+                            fontSize = 13.sp,
+                        )
+                    }
+                    if (extraMeta.isNotEmpty()) {
+                        Text(
+                            text = extraMeta,
+                            color = colors.inkSecondary,
+                            fontSize = 13.sp,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
             }
             if (book.originName.isNotBlank()) {
                 Spacer(modifier = Modifier.height(4.dp))
@@ -298,6 +329,13 @@ fun InkBookDetailScreen(
             }
 
             InkCardGroup {
+                if (!book.isLocal) {
+                    InkListRow(
+                        title = "切换书源",
+                        subtitle = book.originName.takeIf { it.isNotBlank() }?.let { "当前：$it" } ?: "搜索其他可用书源",
+                        onClick = { showChangeSourceSheet = true },
+                    )
+                }
                 InkListRow(
                     title = "最新章节",
                     subtitle = book.latestChapterTitle?.takeIf { it.isNotBlank() } ?: "暂无章节信息",
@@ -360,9 +398,19 @@ fun InkBookDetailScreen(
                         CircularProgressIndicator(color = colors.ink, strokeWidth = 2.dp)
                     }
                 } else if (state.chapters.isEmpty()) {
+                    val canSwitch = state.book?.isLocal == false
                     InkEmptyState(
                         title = "暂无目录",
                         subtitle = state.errorMessage ?: "请稍后再试或切换其他书源",
+                        actionLabel = if (canSwitch) "切换书源" else null,
+                        onAction = if (canSwitch) {
+                            {
+                                showTocSheet = false
+                                showChangeSourceSheet = true
+                            }
+                        } else {
+                            null
+                        },
                     )
                 } else {
                     val displayChapters = if (reverseToc) state.chapters.reversed() else state.chapters
@@ -403,6 +451,19 @@ fun InkBookDetailScreen(
                     }
                 }
             }
+        }
+    }
+
+    if (showChangeSourceSheet) {
+        state.book?.let { currentBook ->
+            InkChangeSourceSheet(
+                book = currentBook,
+                onDismiss = { showChangeSourceSheet = false },
+                onSwitchSource = { source, newBook, toc ->
+                    showChangeSourceSheet = false
+                    viewModel.switchSource(source, newBook, toc)
+                },
+            )
         }
     }
 }

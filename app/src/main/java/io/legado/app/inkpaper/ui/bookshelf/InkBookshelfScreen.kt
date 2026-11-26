@@ -32,6 +32,7 @@ import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.FileOpen
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Search
@@ -50,6 +51,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,8 +73,14 @@ import io.legado.app.inkpaper.design.InkPageHeader
 import io.legado.app.inkpaper.design.InkSwitch
 import io.legado.app.inkpaper.design.InkTheme
 import io.legado.app.inkpaper.design.InkThemeController
+import io.legado.app.inkpaper.ui.search.InkAddBookUrlSheet
+import io.legado.app.inkpaper.ui.search.InkBookUrlResolveResult
+import io.legado.app.inkpaper.ui.search.InkBookUrlResolver
 import io.legado.app.inkpaper.ui.settings.InkLocalImportSheet
 import io.legado.app.utils.startActivityForBook
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -95,6 +103,11 @@ fun InkBookshelfScreen(
 
     var showMoreSheet by remember { mutableStateOf(false) }
     var showLocalImportSheet by remember { mutableStateOf(false) }
+    var showAddUrlSheet by remember { mutableStateOf(false) }
+    var isAddingUrl by remember { mutableStateOf(false) }
+    var urlAddError by remember { mutableStateOf<String?>(null) }
+    var urlNeedSource by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     var actionBook by remember { mutableStateOf<Book?>(null) }
     var confirmRemoveBook by remember { mutableStateOf<Book?>(null) }
 
@@ -355,6 +368,22 @@ fun InkBookshelfScreen(
                     },
                 )
                 InkListRow(
+                    title = "链接 / 番茄 ID 加书",
+                    leading = {
+                        Icon(
+                            imageVector = Icons.Outlined.Link,
+                            contentDescription = null,
+                            tint = colors.inkSecondary,
+                        )
+                    },
+                    onClick = {
+                        showMoreSheet = false
+                        urlAddError = null
+                        urlNeedSource = false
+                        showAddUrlSheet = true
+                    },
+                )
+                InkListRow(
                     title = "书源管理",
                     leading = {
                         Icon(
@@ -375,6 +404,37 @@ fun InkBookshelfScreen(
 
     if (showLocalImportSheet) {
         InkLocalImportSheet(onDismiss = { showLocalImportSheet = false })
+    }
+
+    if (showAddUrlSheet) {
+        InkAddBookUrlSheet(
+            isLoading = isAddingUrl,
+            errorMessage = urlAddError,
+            showOpenSourcesHint = urlNeedSource,
+            onDismiss = { showAddUrlSheet = false },
+            onSubmit = { input ->
+                scope.launch {
+                    isAddingUrl = true
+                    urlAddError = null
+                    urlNeedSource = false
+                    val result = withContext(Dispatchers.IO) {
+                        InkBookUrlResolver.resolve(input)
+                    }
+                    isAddingUrl = false
+                    when (result) {
+                        is InkBookUrlResolveResult.Success -> {
+                            showAddUrlSheet = false
+                            onOpenDetail(result.book)
+                        }
+                        is InkBookUrlResolveResult.Failure -> {
+                            urlAddError = result.message
+                            urlNeedSource = result.needEnableSource
+                        }
+                    }
+                }
+            },
+            onOpenBookSources = onOpenBookSources,
+        )
     }
 
     actionBook?.let { book ->

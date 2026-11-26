@@ -71,6 +71,9 @@ by appCtx.getSharedPreferences("local", Context.MODE_PRIVATE) {
     val needUpDictRule: Boolean
         get() = !isLastVersion(2, "needUpDictRule")
 
+    val needUpBookSources: Boolean
+        get() = !isLastVersion(1, "bookSourcesVersion")
+
     var versionCode
         get() = getLong(versionCodeKey, 0)
         set(value) {
@@ -142,6 +145,16 @@ by appCtx.getSharedPreferences("local", Context.MODE_PRIVATE) {
         get() = getBoolean("appCrash")
         set(value) {
             putBoolean("appCrash", value)
+        }
+
+    var lastSearchGroup: String?
+        get() = getString("lastSearchGroup", null)?.takeIf { it.isNotBlank() }
+        set(value) {
+            if (value.isNullOrBlank()) {
+                remove("lastSearchGroup")
+            } else {
+                putString("lastSearchGroup", value)
+            }
         }
 
 }

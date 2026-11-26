@@ -31,8 +31,10 @@ import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.FileOpen
 import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -65,7 +67,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.legado.app.data.entities.BookSourceCheckState
 import io.legado.app.data.entities.BookSourcePart
+import io.legado.app.data.entities.RuleSub
 import io.legado.app.inkpaper.design.InkEmptyState
 import io.legado.app.inkpaper.design.InkFilterChip
 import io.legado.app.inkpaper.design.InkListRow
@@ -73,6 +77,10 @@ import io.legado.app.inkpaper.design.InkSubTopBar
 import io.legado.app.inkpaper.design.InkSwitch
 import io.legado.app.inkpaper.design.InkTheme
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
+import io.legado.app.ui.login.SourceLoginActivity
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,14 +94,20 @@ fun InkBookSourcesScreen(
     val filter by viewModel.filter.collectAsStateWithLifecycle()
     val sources by viewModel.filteredSources.collectAsStateWithLifecycle()
     val groups by viewModel.groups.collectAsStateWithLifecycle()
+    val subscriptions by viewModel.subscriptions.collectAsStateWithLifecycle()
     val isImporting by viewModel.isImporting.collectAsStateWithLifecycle()
+    val isSyncingSub by viewModel.isSyncingSub.collectAsStateWithLifecycle()
     val statusMessage by viewModel.statusMessage.collectAsStateWithLifecycle()
 
     var showImportSheet by remember { mutableStateOf(false) }
     var showBatchSheet by remember { mutableStateOf(false) }
+    var showSubSheet by remember { mutableStateOf(false) }
     var actionSource by remember { mutableStateOf<BookSourcePart?>(null) }
     var confirmDeleteSource by remember { mutableStateOf<BookSourcePart?>(null) }
+    var confirmResetBuiltin by remember { mutableStateOf(false) }
     var importText by remember { mutableStateOf("") }
+    var subName by remember { mutableStateOf("") }
+    var subUrl by remember { mutableStateOf("") }
 
     val openJsonLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -243,6 +257,12 @@ fun InkBookSourcesScreen(
                             )
                             val sub = listOfNotNull(
                                 part.bookSourceGroup?.takeIf { it.isNotBlank() },
+                                if (part.hasLoginUrl) "需登录" else null,
+                                when (part.checkStatus) {
+                                    BookSourceCheckState.PASSED -> "可用"
+                                    BookSourceCheckState.FAILED -> "校验失效"
+                                    else -> null
+                                },
                                 if (part.hasExploreUrl && part.enabledExplore) "支持发现" else null,
                             ).joinToString(" · ")
                             if (sub.isNotBlank()) {
@@ -348,6 +368,41 @@ fun InkBookSourcesScreen(
         ) {
             Column(modifier = Modifier.padding(bottom = 24.dp)) {
                 InkListRow(
+                    title = "校验当前列表书源 (${sources.size})",
+                    onClick = {
+                        showBatchSheet = false
+                        viewModel.checkFilteredSources(context)
+                    },
+                )
+                InkListRow(
+                    title = "禁用校验失效书源",
+                    onClick = {
+                        showBatchSheet = false
+                        viewModel.disableFailedSources()
+                    },
+                )
+                InkListRow(
+                    title = "书源订阅管理 (${subscriptions.size})",
+                    onClick = {
+                        showBatchSheet = false
+                        showSubSheet = true
+                    },
+                )
+                InkListRow(
+                    title = "同步内置精选书源",
+                    onClick = {
+                        showBatchSheet = false
+                        viewModel.syncBuiltinSources()
+                    },
+                )
+                InkListRow(
+                    title = "重置为内置精选书源（清空旧源）",
+                    onClick = {
+                        showBatchSheet = false
+                        confirmResetBuiltin = true
+                    },
+                )
+                InkListRow(
                     title = "启用当前列表 (${sources.size})",
                     onClick = {
                         showBatchSheet = false
@@ -397,6 +452,21 @@ fun InkBookSourcesScreen(
                         viewModel.toggleEnabled(part)
                     },
                 )
+                if (part.hasLoginUrl) {
+                    InkListRow(
+                        title = "登录书源账号",
+                        leading = { Icon(Icons.Outlined.PersonOutline, contentDescription = null, tint = colors.inkSecondary) },
+                        onClick = {
+                            actionSource = null
+                            context.startActivity(
+                                Intent(context, SourceLoginActivity::class.java).apply {
+                                    putExtra("type", "bookSource")
+                                    putExtra("key", part.bookSourceUrl)
+                                },
+                            )
+                        },
+                    )
+                }
                 if (part.hasExploreUrl) {
                     InkListRow(
                         title = if (part.enabledExplore) "关闭发现" else "开启发现",
@@ -464,5 +534,130 @@ fun InkBookSourcesScreen(
                 }
             },
         )
+    }
+
+    if (confirmResetBuiltin) {
+        AlertDialog(
+            onDismissRequest = { confirmResetBuiltin = false },
+            containerColor = colors.surface,
+            titleContentColor = colors.ink,
+            textContentColor = colors.inkSecondary,
+            title = { Text("重置为内置精选书源", fontSize = 17.sp, fontWeight = FontWeight.SemiBold) },
+            text = { Text("将清空当前全部书源并恢复为内置精选书源，确定继续吗？", fontSize = 14.sp) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmResetBuiltin = false
+                        viewModel.resetToBuiltinSources()
+                    },
+                ) {
+                    Text("重置", color = colors.ink, fontWeight = FontWeight.Medium)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmResetBuiltin = false }) {
+                    Text("取消", color = colors.inkSecondary)
+                }
+            },
+        )
+    }
+
+    if (showSubSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { if (!isSyncingSub) showSubSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = colors.surface,
+            contentColor = colors.ink,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .navigationBarsPadding()
+                    .padding(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("书源订阅管理", color = colors.ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                OutlinedTextField(
+                    value = subName,
+                    onValueChange = { subName = it },
+                    placeholder = { Text("订阅名称（可选）", color = colors.inkSecondary, fontSize = 13.5.sp) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = colors.ink,
+                        unfocusedBorderColor = colors.line,
+                        focusedTextColor = colors.ink,
+                        unfocusedTextColor = colors.ink,
+                        cursorColor = colors.ink,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = subUrl,
+                    onValueChange = { subUrl = it },
+                    placeholder = { Text("订阅地址（https://...json）", color = colors.inkSecondary, fontSize = 13.5.sp) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = colors.ink,
+                        unfocusedBorderColor = colors.line,
+                        focusedTextColor = colors.ink,
+                        unfocusedTextColor = colors.ink,
+                        cursorColor = colors.ink,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Button(
+                    onClick = {
+                        viewModel.addSubscription(subName, subUrl)
+                        subName = ""
+                        subUrl = ""
+                    },
+                    enabled = subUrl.isNotBlank() && !isSyncingSub,
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colors.ink,
+                        contentColor = colors.inkOnSolid,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    if (isSyncingSub) {
+                        CircularProgressIndicator(color = colors.inkOnSolid, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                    } else {
+                        Text("添加并同步", fontSize = 13.5.sp)
+                    }
+                }
+                if (subscriptions.isNotEmpty()) {
+                    HorizontalDivider(thickness = 0.5.dp, color = colors.line)
+                    val dateFormat = remember { SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()) }
+                    subscriptions.forEach { sub ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(sub.name, color = colors.ink, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                val timeText = if (sub.update > 0) "上次同步 ${dateFormat.format(Date(sub.update))}" else "尚未同步"
+                                Text("$timeText · ${sub.url}", color = colors.inkSecondary, fontSize = 11.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            IconButton(
+                                onClick = { viewModel.syncSubscription(sub) },
+                                enabled = !isSyncingSub,
+                            ) {
+                                Icon(Icons.Outlined.Sync, contentDescription = "同步", tint = colors.ink)
+                            }
+                            IconButton(
+                                onClick = { viewModel.deleteSubscription(sub) },
+                                enabled = !isSyncingSub,
+                            ) {
+                                Icon(Icons.Outlined.DeleteOutline, contentDescription = "删除", tint = colors.inkSecondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

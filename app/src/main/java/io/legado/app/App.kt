@@ -104,6 +104,7 @@ class App : Application() {
                 .enableLogger(BuildConfig.DEBUG || AppConfig.recordLog)
                 .setLogger(EventLogger())
             DefaultData.upVersion()
+            launch { DefaultData.syncAutoUpdateBookSourceSubs() }
             AppFreezeMonitor.init(this@App)
             DispatchersMonitor.init()
             URL.setURLStreamHandlerFactory(ObsoleteUrlFactory(okHttpClient))

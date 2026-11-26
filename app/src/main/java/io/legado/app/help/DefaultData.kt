@@ -2,6 +2,7 @@ package io.legado.app.help
 
 import io.legado.app.constant.AppConst
 import io.legado.app.data.appDb
+import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.DictRule
 import io.legado.app.data.entities.HttpTTS
 import io.legado.app.data.entities.KeyboardAssist
@@ -11,8 +12,10 @@ import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ThemeConfig
 import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.help.source.SourceHelp
 import io.legado.app.help.source.clearSharedGlobalState
 import io.legado.app.model.BookCover
+import io.legado.app.model.RuleUpdate
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
 import io.legado.app.utils.fromJsonObject
@@ -36,6 +39,9 @@ object DefaultData {
                 }
                 if (LocalConfig.needUpDictRule) {
                     importDefaultDictRules()
+                }
+                if (LocalConfig.needUpBookSources) {
+                    importDefaultBookSources(overwriteExisting = false)
                 }
             }.onError {
                 it.printOnDebug()
@@ -111,6 +117,37 @@ object DefaultData {
         GSON.fromJsonArray<KeyboardAssist>(json).getOrThrow()
     }
 
+    val bookSources: List<BookSource> by lazy {
+        val json = String(
+            appCtx.assets.open("defaultData${File.separator}bookSources.json")
+                .readBytes()
+        )
+        GSON.fromJsonArray<BookSource>(json).getOrDefault(emptyList())
+    }
+
+    fun importDefaultBookSources(overwriteExisting: Boolean = false): Int {
+        if (!overwriteExisting && appDb.bookSourceDao.allCount() > 0) {
+            return 0
+        }
+        val sources = bookSources
+        if (sources.isNotEmpty()) {
+            SourceHelp.insertBookSource(*sources.toTypedArray())
+        }
+        return sources.size
+    }
+
+    fun resetToDefaultBookSources(): Int {
+        val existing = appDb.bookSourceDao.all
+        if (existing.isNotEmpty()) {
+            SourceHelp.deleteBookSources(existing)
+        }
+        val sources = bookSources
+        if (sources.isNotEmpty()) {
+            SourceHelp.insertBookSource(*sources.toTypedArray())
+        }
+        return sources.size
+    }
+
     fun importDefaultHttpTTS() {
         appDb.httpTTSDao.all
             .filter { it.id < 0 }
@@ -134,6 +171,24 @@ object DefaultData {
 
     fun importDefaultDictRules() {
         appDb.dictRuleDao.insert(*dictRules.toTypedArray())
+    }
+
+    suspend fun syncAutoUpdateBookSourceSubs() {
+        val now = System.currentTimeMillis()
+        appDb.ruleSubDao.all
+            .filter { it.type == 0 && it.autoUpdate && it.url.isNotBlank() }
+            .forEach { sub ->
+                val intervalHours = if (sub.updateInterval > 0) sub.updateInterval else 24
+                if (sub.update + intervalHours * 3600_000L <= now) {
+                    runCatching {
+                        RuleUpdate.cacheSource(
+                            sub.copy(silentUpdate = true, updateInterval = intervalHours),
+                        )
+                    }.onFailure {
+                        it.printOnDebug()
+                    }
+                }
+            }
     }
 
 }

@@ -1,5 +1,10 @@
 package io.legado.app.inkpaper.ui.search
 
+import android.app.Activity
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,31 +18,43 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -47,24 +64,61 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.inkpaper.design.InkBookCover
 import io.legado.app.inkpaper.design.InkEmptyState
 import io.legado.app.inkpaper.design.InkFilterChip
 import io.legado.app.inkpaper.design.InkTheme
+import io.legado.app.ui.browser.WebViewActivity
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun InkSearchScreen(
     onBack: () -> Unit,
     onSelectResult: (SearchBook) -> Unit,
+    initialQuery: String = "",
+    onOpenBookSources: () -> Unit = {},
+    onBookAddedByUrl: (Book) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: InkSearchViewModel = viewModel(),
 ) {
     val colors = InkTheme.colors
+    val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
+    val availableGroups by viewModel.availableGroups.collectAsStateWithLifecycle()
+    val disabledBackupCount by viewModel.disabledBackupCount.collectAsStateWithLifecycle()
     val keyboard = LocalSoftwareKeyboardController.current
+
+    var showAddUrlSheet by remember { mutableStateOf(false) }
+    var urlSheetInitialInput by remember { mutableStateOf("") }
+
+    val webSearchLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val pickedQuery = result.data?.getStringExtra("searchQuery")?.trim().orEmpty()
+            val pickedUrl = result.data?.getStringExtra("bookUrl")?.trim().orEmpty()
+            if (pickedQuery.isNotEmpty()) {
+                viewModel.submitSearch(pickedQuery)
+            } else if (pickedUrl.isNotEmpty()) {
+                urlSheetInitialInput = pickedUrl
+                viewModel.clearUrlAddError()
+                showAddUrlSheet = true
+                viewModel.addBookByUrlOrId(pickedUrl) { book ->
+                    showAddUrlSheet = false
+                    onBookAddedByUrl(book)
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(initialQuery) {
+        if (initialQuery.isNotBlank() && !state.hasSubmitted) {
+            viewModel.submitSearch(initialQuery)
+        }
+    }
 
     Column(
         modifier = modifier
@@ -75,7 +129,7 @@ fun InkSearchScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(start = 6.dp, end = 16.dp, top = 8.dp, bottom = 10.dp),
+                .padding(start = 6.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -143,6 +197,19 @@ fun InkSearchScreen(
                     )
                 }
             }
+            IconButton(
+                onClick = {
+                    urlSheetInitialInput = ""
+                    viewModel.clearUrlAddError()
+                    showAddUrlSheet = true
+                },
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Link,
+                    contentDescription = "链接或 ID 添加",
+                    tint = colors.ink,
+                )
+            }
             Text(
                 text = if (state.isSearching) "停止" else "搜索",
                 color = colors.inkOnSolid,
@@ -157,6 +224,36 @@ fun InkSearchScreen(
                     }
                     .padding(horizontal = 14.dp, vertical = 9.dp),
             )
+        }
+
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(bottom = 10.dp),
+        ) {
+            item {
+                InkFilterChip(
+                    text = "精准",
+                    selected = state.precisionSearch,
+                    onClick = { viewModel.togglePrecisionSearch() },
+                )
+            }
+            item {
+                InkFilterChip(
+                    text = "全部启用",
+                    selected = state.selectedGroup == null,
+                    onClick = { viewModel.selectGroup(null) },
+                )
+            }
+            items(availableGroups) { group ->
+                InkFilterChip(
+                    text = group,
+                    selected = state.selectedGroup == group,
+                    onClick = {
+                        viewModel.selectGroup(if (state.selectedGroup == group) null else group)
+                    },
+                )
+            }
         }
 
         if (state.isSearching && state.totalSources > 0) {
@@ -216,7 +313,7 @@ fun InkSearchScreen(
                 } else {
                     InkEmptyState(
                         title = "全网书源聚合搜索",
-                        subtitle = "输入书名或作者，将自动归并同一本书的多个书源",
+                        subtitle = "输入书名或作者，将自动归并同一本书的多个书源；右上角链接图标支持网址或番茄 ID 直达",
                     )
                 }
             }
@@ -236,14 +333,50 @@ fun InkSearchScreen(
             }
 
             if (!state.isSearching && state.results.isEmpty()) {
-                InkEmptyState(
-                    title = "未找到相关书籍",
-                    subtitle = state.errorMessage ?: "换个关键词试试，或检查启用的书源设置",
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 20.dp)
+                        .navigationBarsPadding(),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                    InkEmptyState(
+                        title = "未找到相关书籍",
+                        subtitle = state.errorMessage ?: "可能是平台改名书、小众原创或当前分组未收录",
+                    )
+                    InkSearchFallbackPanel(
+                        query = state.query,
+                        precisionSearch = state.precisionSearch,
+                        selectedGroup = state.selectedGroup,
+                        disabledBackupCount = disabledBackupCount,
+                        fallbackHints = state.fallbackHints,
+                        onTogglePrecision = { viewModel.togglePrecisionSearch() },
+                        onResetGroup = { viewModel.selectGroup(null) },
+                        onEnableBackupRetry = { viewModel.enableBackupSourcesAndRetry() },
+                        onRetryHint = { hint -> viewModel.submitSearch(hint) },
+                        onOpenWebSearch = {
+                            webSearchLauncher.launch(
+                                Intent(context, WebViewActivity::class.java).apply {
+                                    putExtra("url", InkSearchQueryHelper.buildWebSearchUrl(state.query))
+                                    putExtra("title", "全网查书：${state.query}")
+                                    putExtra("enableSearchReturn", true)
+                                },
+                            )
+                        },
+                        onOpenAddUrl = {
+                            urlSheetInitialInput = ""
+                            viewModel.clearUrlAddError()
+                            showAddUrlSheet = true
+                        },
+                    )
+                }
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .navigationBarsPadding(),
                 ) {
                     items(state.results, key = { it.bookUrl }) { item ->
                         SearchResultRow(
@@ -252,7 +385,145 @@ fun InkSearchScreen(
                         )
                         HorizontalDivider(thickness = 0.5.dp, color = colors.line)
                     }
+                    if (!state.isSearching && state.results.size in 1..2) {
+                        item(key = "fallback_panel") {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            InkSearchFallbackPanel(
+                                query = state.query,
+                                precisionSearch = state.precisionSearch,
+                                selectedGroup = state.selectedGroup,
+                                disabledBackupCount = disabledBackupCount,
+                                fallbackHints = state.fallbackHints,
+                                onTogglePrecision = { viewModel.togglePrecisionSearch() },
+                                onResetGroup = { viewModel.selectGroup(null) },
+                                onEnableBackupRetry = { viewModel.enableBackupSourcesAndRetry() },
+                                onRetryHint = { hint -> viewModel.submitSearch(hint) },
+                                onOpenWebSearch = {
+                                    webSearchLauncher.launch(
+                                        Intent(context, WebViewActivity::class.java).apply {
+                                            putExtra("url", InkSearchQueryHelper.buildWebSearchUrl(state.query))
+                                            putExtra("title", "全网查书：${state.query}")
+                                            putExtra("enableSearchReturn", true)
+                                        },
+                                    )
+                                },
+                                onOpenAddUrl = {
+                                    urlSheetInitialInput = ""
+                                    viewModel.clearUrlAddError()
+                                    showAddUrlSheet = true
+                                },
+                            )
+                            Spacer(modifier = Modifier.height(24.dp))
+                        }
+                    }
                 }
+            }
+        }
+    }
+
+    if (showAddUrlSheet) {
+        InkAddBookUrlSheet(
+            initialInput = urlSheetInitialInput,
+            isLoading = state.isAddingUrl,
+            errorMessage = state.urlAddError,
+            showOpenSourcesHint = state.urlAddNeedEnableSource,
+            onDismiss = { showAddUrlSheet = false },
+            onSubmit = { input ->
+                viewModel.addBookByUrlOrId(input) { book ->
+                    showAddUrlSheet = false
+                    onBookAddedByUrl(book)
+                }
+            },
+            onOpenBookSources = onOpenBookSources,
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun InkSearchFallbackPanel(
+    query: String,
+    precisionSearch: Boolean,
+    selectedGroup: String?,
+    disabledBackupCount: Int,
+    fallbackHints: List<String>,
+    onTogglePrecision: () -> Unit,
+    onResetGroup: () -> Unit,
+    onEnableBackupRetry: () -> Unit,
+    onRetryHint: (String) -> Unit,
+    onOpenWebSearch: () -> Unit,
+    onOpenAddUrl: () -> Unit,
+) {
+    val colors = InkTheme.colors
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(colors.surfaceSubtle)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            text = "没找到目标书？可能是改名书或小众书",
+            color = colors.ink,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (precisionSearch) {
+                InkFilterChip(
+                    text = "关闭精准匹配重试",
+                    selected = false,
+                    onClick = onTogglePrecision,
+                )
+            }
+            if (selectedGroup != null) {
+                InkFilterChip(
+                    text = "搜全部启用书源",
+                    selected = false,
+                    onClick = onResetGroup,
+                )
+            }
+            if (disabledBackupCount > 0) {
+                InkFilterChip(
+                    text = "启用备用源重搜 (+$disabledBackupCount)",
+                    selected = false,
+                    onClick = onEnableBackupRetry,
+                )
+            }
+            fallbackHints.forEach { hint ->
+                InkFilterChip(
+                    text = "改搜「$hint」",
+                    selected = false,
+                    onClick = { onRetryHint(hint) },
+                )
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            OutlinedButton(
+                onClick = onOpenWebSearch,
+                enabled = query.isNotBlank(),
+                shape = CircleShape,
+                border = BorderStroke(0.5.dp, colors.line),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.ink),
+                modifier = Modifier.weight(1f),
+            ) {
+                Text("浏览器查作者/旧名", fontSize = 12.5.sp, maxLines = 1)
+            }
+            OutlinedButton(
+                onClick = onOpenAddUrl,
+                shape = CircleShape,
+                border = BorderStroke(0.5.dp, colors.line),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.ink),
+                modifier = Modifier.weight(1f),
+            ) {
+                Text("粘贴链接 / 番茄 ID", fontSize = 12.5.sp, maxLines = 1)
             }
         }
     }
