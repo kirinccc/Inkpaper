@@ -131,15 +131,22 @@ fun InkSearchScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(start = 6.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                .padding(start = 10.dp, end = 16.dp, top = 8.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            IconButton(onClick = onBack) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = onBack),
+                contentAlignment = Alignment.Center,
+            ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
                     contentDescription = "返回",
                     tint = colors.ink,
+                    modifier = Modifier.size(20.dp),
                 )
             }
             Row(
@@ -156,7 +163,7 @@ fun InkSearchScreen(
                     imageVector = Icons.Outlined.Search,
                     contentDescription = null,
                     tint = colors.inkSecondary,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(17.dp),
                 )
                 Box(
                     modifier = Modifier.weight(1f),
@@ -164,9 +171,12 @@ fun InkSearchScreen(
                 ) {
                     if (state.query.isEmpty()) {
                         Text(
-                            text = "搜索书名、作者、书源",
+                            text = "搜书名或作者",
                             color = colors.inkSecondary,
-                            fontSize = 14.sp,
+                            fontSize = 13.5.sp,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                     BasicTextField(
@@ -197,26 +207,28 @@ fun InkSearchScreen(
                             .size(18.dp)
                             .clickable { viewModel.updateQuery("") },
                     )
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.Link,
+                        contentDescription = "链接或 ID 添加",
+                        tint = colors.inkSecondary,
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clickable {
+                                urlSheetInitialInput = ""
+                                viewModel.clearUrlAddError()
+                                showAddUrlSheet = true
+                            },
+                    )
                 }
-            }
-            IconButton(
-                onClick = {
-                    urlSheetInitialInput = ""
-                    viewModel.clearUrlAddError()
-                    showAddUrlSheet = true
-                },
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Link,
-                    contentDescription = "链接或 ID 添加",
-                    tint = colors.ink,
-                )
             }
             Text(
                 text = if (state.isSearching) "停止" else "搜索",
                 color = colors.inkOnSolid,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                softWrap = false,
                 modifier = Modifier
                     .clip(CircleShape)
                     .background(colors.ink)
@@ -315,7 +327,7 @@ fun InkSearchScreen(
                 } else {
                     InkEmptyState(
                         title = "全网书源聚合搜索",
-                        subtitle = "输入书名或作者，将自动归并同一本书的多个书源；右上角链接图标支持网址或番茄 ID 直达",
+                        subtitle = "输入书名或作者，自动归并同一本书的多个书源；点击输入框右侧链接图标可用网址或番茄 ID 直达",
                     )
                 }
             }
