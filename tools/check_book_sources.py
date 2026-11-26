@@ -20,7 +20,13 @@ from collections import Counter
 from pathlib import Path
 
 DEFAULT_JSON_PATH = Path(__file__).resolve().parent.parent / "app" / "src" / "main" / "assets" / "defaultData" / "bookSources.json"
-REGRESSION_KEYWORDS = ["斗破苍穹", "十日终焉", "弊不可避"]
+BENCHMARK_MATRIX = {
+    "连载VIP": "宿命之环",
+    "完本长篇": "斗破苍穹",
+    "改名热书": "十日终焉",
+    "近期新书": "弊不可避",
+}
+REGRESSION_KEYWORDS = list(BENCHMARK_MATRIX.values())
 USER_AGENT = "Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
 
@@ -209,6 +215,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Audit bundled Legado bookSources.json")
     parser.add_argument("path", nargs="?", default=str(DEFAULT_JSON_PATH), help="Path to bookSources.json")
     parser.add_argument("--keyword", default=REGRESSION_KEYWORDS[0], help="Primary search keyword to probe")
+    parser.add_argument("--output-verified", default="", help="Optional path to write filtered verified_sources.json")
+    parser.add_argument("--strict", action="store_true", help="Exclude JS_OR_POST_BASE_OK and unverified sources from --output-verified")
     args = parser.parse_args()
 
     json_path = Path(args.path)
@@ -238,6 +246,7 @@ def main() -> int:
     schema_errors = [r for r in results if r["schema_issues"]]
 
     print(f"File: {json_path}")
+    print(f"Benchmark matrix: {BENCHMARK_MATRIX}")
     print(f"Total sources: {len(results)} | Enabled: {enabled_count} | Disabled: {len(results) - enabled_count}")
     print("Categories:", dict(cat_counts))
     print("Groups:", dict(group_counts))
@@ -251,6 +260,25 @@ def main() -> int:
         login_tag = " [LOGIN]" if r["requires_login"] else ""
         en_tag = "ON" if r["enabled"] else "OFF"
         print(f"[{r['index']:02d}] [{en_tag:3s}] [{r['category']:19s}]{login_tag} {r['name']} ({r['group']}) | {r['url']} | {r['detail']}")
+
+    if args.output_verified:
+        allowed_cats = {"OK_SEARCH"} if args.strict else {"OK_SEARCH", "JS_OR_POST_BASE_OK"}
+        verified = []
+        for r in results:
+            if r["schema_issues"]:
+                continue
+            if r["category"] not in allowed_cats:
+                continue
+            if args.strict and r["category"] == "OK_SEARCH" and "hit=True" not in r["detail"]:
+                continue
+            src = dict(sources[r["index"]])
+            src["customOrder"] = len(verified)
+            verified.append(src)
+        out_path = Path(args.output_verified)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with out_path.open("w", encoding="utf-8") as f:
+            json.dump(verified, f, ensure_ascii=False, indent=2)
+        print(f"\nWrote {len(verified)} verified sources to {out_path}")
 
     return 0
 

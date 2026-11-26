@@ -8,6 +8,7 @@ import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.config.AppConfig
+import io.legado.app.inkpaper.source.SourceHealthManager
 import io.legado.app.ui.book.search.SearchScope
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.mapParallelSafe
@@ -86,6 +87,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
         val sourceParts = bookSourceParts
         val key = searchKey
         val page = searchPage
+        val sourceScoreMap = SourceHealthManager.loadScoreSnapshot(sourceParts)
         val progress = SearchProgressReporter(sourceParts.size, callBack::onSearchProgress)
         activeProgress.getAndSet(progress)?.cancel()
         val job = scope.launch(searchPool!!, start = CoroutineStart.LAZY) {
@@ -125,7 +127,7 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
                 }
                 hasMore = hasMore || items.isNotEmpty()
                 appDb.searchBookDao.insert(*items.toTypedArray())
-                mergeItems(items, precision, key)
+                mergeItems(items, precision, key, sourceScoreMap)
                 currentCoroutineContext().ensureActive()
                 callBack.onSearchSuccess(searchBooks)
             }.onCompletion { error ->
@@ -150,8 +152,14 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
         job.start()
     }
 
-    private suspend fun mergeItems(newDataS: List<SearchBook>, precision: Boolean, key: String) {
+    private suspend fun mergeItems(
+        newDataS: List<SearchBook>,
+        precision: Boolean,
+        key: String,
+        sourceScoreMap: Map<String, Double>,
+    ) {
         if (newDataS.isNotEmpty()) {
+            val scoreOf: (String) -> Double = { origin -> sourceScoreMap[origin] ?: 0.0 }
             val copyData = ArrayList(searchBooks)
             val equalData = arrayListOf<SearchBook>()
             val containsData = arrayListOf<SearchBook>()
@@ -171,62 +179,38 @@ class SearchModel(private val scope: CoroutineScope, private val callBack: CallB
             }
             newDataS.forEach { nBook ->
                 currentCoroutineContext().ensureActive()
-                if (nBook.name == key || nBook.author == key) {
-                    var hasSame = false
-                    equalData.forEach { pBook ->
+                val targetList = when {
+                    nBook.name == key || nBook.author == key -> equalData
+                    nBook.kind?.contains(key) == true -> tagsData
+                    nBook.name.contains(key) || nBook.author.contains(key) -> containsData
+                    !precision -> otherData
+                    else -> null
+                }
+                if (targetList != null) {
+                    var merged = false
+                    for (i in targetList.indices) {
                         currentCoroutineContext().ensureActive()
+                        val pBook = targetList[i]
                         if (pBook.name == nBook.name && pBook.author == nBook.author) {
-                            pBook.addOrigin(nBook.origin)
-                            hasSame = true
+                            targetList[i] = SourceHealthManager.mergeSearchCandidate(pBook, nBook, scoreOf)
+                            merged = true
+                            break
                         }
                     }
-                    if (!hasSame) {
-                        equalData.add(nBook)
-                    }
-                } else if (nBook.kind?.contains(key) == true) {
-                    var hasSame = false
-                    tagsData.forEach { pBook ->
-                        currentCoroutineContext().ensureActive()
-                        if (pBook.name == nBook.name && pBook.author == nBook.author) {
-                            pBook.addOrigin(nBook.origin)
-                            hasSame = true
-                        }
-                    }
-                    if (!hasSame) {
-                        tagsData.add(nBook)
-                    }
-                } else if (nBook.name.contains(key) || nBook.author.contains(key)) {
-                    var hasSame = false
-                    containsData.forEach { pBook ->
-                        currentCoroutineContext().ensureActive()
-                        if (pBook.name == nBook.name && pBook.author == nBook.author) {
-                            pBook.addOrigin(nBook.origin)
-                            hasSame = true
-                        }
-                    }
-                    if (!hasSame) {
-                        containsData.add(nBook)
-                    }
-                } else if (!precision) {
-                    var hasSame = false
-                    otherData.forEach { pBook ->
-                        currentCoroutineContext().ensureActive()
-                        if (pBook.name == nBook.name && pBook.author == nBook.author) {
-                            pBook.addOrigin(nBook.origin)
-                            hasSame = true
-                        }
-                    }
-                    if (!hasSame) {
-                        otherData.add(nBook)
+                    if (!merged) {
+                        targetList.add(nBook)
                     }
                 }
             }
             currentCoroutineContext().ensureActive()
-            equalData.sortByDescending { it.origins.size }
-            equalData.addAll(tagsData.sortedByDescending { it.origins.size })
-            equalData.addAll(containsData.sortedByDescending { it.origins.size })
+            val comparator = compareByDescending<SearchBook> { (sourceScoreMap[it.origin] ?: 0.0) > -5000.0 }
+                .thenByDescending { it.origins.size }
+                .thenByDescending { sourceScoreMap[it.origin] ?: 0.0 }
+            equalData.sortWith(comparator)
+            equalData.addAll(tagsData.sortedWith(comparator))
+            equalData.addAll(containsData.sortedWith(comparator))
             if (!precision) {
-                equalData.addAll(otherData)
+                equalData.addAll(otherData.sortedWith(comparator))
             }
             currentCoroutineContext().ensureActive()
             searchBooks = equalData

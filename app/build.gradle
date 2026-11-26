@@ -37,6 +37,15 @@ try {
     // Keep source archives buildable when Git is unavailable.
 }
 def armOnly = project.findProperty("armOnly")?.toBoolean() ?: false
+def localProps = new Properties()
+def localPropsFile = rootProject.file("local.properties")
+if (localPropsFile.isFile()) {
+    localPropsFile.withInputStream { localProps.load(it) }
+}
+def privateSubUrl = (project.findProperty("inkpaper.defaultSubUrl") ?: localProps.getProperty("inkpaper.defaultSubUrl") ?: "").toString()
+def privateSubName = (project.findProperty("inkpaper.defaultSubName") ?: localProps.getProperty("inkpaper.defaultSubName") ?: "私有精选订阅").toString()
+def privateSubToken = (project.findProperty("inkpaper.defaultSubToken") ?: localProps.getProperty("inkpaper.defaultSubToken") ?: "").toString()
+def escapeBuildConfig = { String v -> v.replace("\\", "\\\\").replace("\"", "\\\"") }
 
 android {
     compileSdk = compile_sdk_version
@@ -141,6 +150,18 @@ android {
         app {
             dimension "mode"
             manifestPlaceholders.put("APP_CHANNEL_VALUE", "app")
+            buildConfigField "boolean", "IS_OSS_BUILD", "false"
+            buildConfigField "String", "INKPAPER_DEFAULT_SUB_URL", "\"${escapeBuildConfig(privateSubUrl)}\""
+            buildConfigField "String", "INKPAPER_DEFAULT_SUB_NAME", "\"${escapeBuildConfig(privateSubName)}\""
+            buildConfigField "String", "INKPAPER_DEFAULT_SUB_TOKEN", "\"${escapeBuildConfig(privateSubToken)}\""
+        }
+        oss {
+            dimension "mode"
+            manifestPlaceholders.put("APP_CHANNEL_VALUE", "oss")
+            buildConfigField "boolean", "IS_OSS_BUILD", "true"
+            buildConfigField "String", "INKPAPER_DEFAULT_SUB_URL", "\"\""
+            buildConfigField "String", "INKPAPER_DEFAULT_SUB_NAME", "\"\""
+            buildConfigField "String", "INKPAPER_DEFAULT_SUB_TOKEN", "\"\""
         }
     }
 

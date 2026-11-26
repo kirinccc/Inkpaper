@@ -9,13 +9,17 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.exception.ConcurrentException
+import io.legado.app.exception.ContentEmptyException
+import io.legado.app.exception.ContentQualityException
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentSaveToken
 import io.legado.app.help.book.refreshBookResources
 import io.legado.app.help.book.isLocal
+import io.legado.app.help.book.isSameNameAuthor
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.CompositeCoroutine
 import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.inkpaper.source.InkAutoSourceFallback
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.CacheBookService
 import io.legado.app.utils.onEachParallel
@@ -502,6 +506,21 @@ object CacheBook {
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
+                    if (!refreshingResources &&
+                        (e is ContentQualityException || e is ContentEmptyException) &&
+                        !requestBook.isLocal &&
+                        ReadBook.book?.isSameNameAuthor(requestBook) == true
+                    ) {
+                        val recovered = InkAutoSourceFallback.tryRecoverChapterAndSwitchSource(
+                            book = requestBook,
+                            failedChapter = chapter,
+                            failedSource = model.bookSource,
+                            isQualityFailure = e is ContentQualityException,
+                        )
+                        if (!recovered.isNullOrBlank()) {
+                            return recovered
+                        }
+                    }
                     if (!model.onError(ticket, requestBook, chapter, e, contentToken)) continue
                     if (refreshingResources) BookHelp.getContent(requestBook, chapter)?.let { return it }
                     return "获取正文失败\n${e.localizedMessage}"

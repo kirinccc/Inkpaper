@@ -1,19 +1,24 @@
 package io.legado.app.model.webBook
 
 import io.legado.app.constant.AppLog
+import io.legado.app.constant.BookSourceType
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.SearchBook
+import io.legado.app.exception.ContentQualityException
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
+import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.removeAllBookType
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.http.StrResponse
 import io.legado.app.help.source.getBookType
 import io.legado.app.help.source.SuppressSourceNavigation
+import io.legado.app.inkpaper.source.ContentQualityValidator
+import io.legado.app.inkpaper.source.SourceHealthManager
 import io.legado.app.model.Debug
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
@@ -433,6 +438,7 @@ object WebBook {
             Debug.log(bookSource.bookSourceUrl, "⇒正文规则为空,使用章节链接:${bookChapter.url}")
             return bookChapter.url
         }
+        val startMs = System.currentTimeMillis()
         val content = if (bookChapter.url == book.bookUrl && !book.tocHtml.isNullOrEmpty()) {
             BookContent.analyzeContent(
                 bookSource = bookSource,
@@ -492,6 +498,19 @@ object WebBook {
                 nextChapterUrl = nextChapterUrl,
                 needSave = false
             )
+        }
+        val elapsedMs = System.currentTimeMillis() - startMs
+        if (!book.isLocal && bookSource.bookSourceType == BookSourceType.default) {
+            val quality = ContentQualityValidator.validate(content, bookChapter.title)
+            if (!quality.isHealthy) {
+                SourceHealthManager.recordContentFailure(
+                    bookSource.bookSourceUrl,
+                    quality.issue,
+                    quality.reason,
+                )
+                throw ContentQualityException(quality)
+            }
+            SourceHealthManager.recordContentSuccess(bookSource.bookSourceUrl, elapsedMs)
         }
         if (saveToken != null) {
             val saved = BookHelp.saveContent(

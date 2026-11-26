@@ -14,6 +14,7 @@ import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.source.requireSourceUrl
 import io.legado.app.help.source.SourceHelp
+import io.legado.app.inkpaper.source.InkRuleSubSync
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
 import java.util.concurrent.ConcurrentHashMap
@@ -34,6 +35,14 @@ object RuleUpdate {
         } else {
             ruleSub.update = System.currentTimeMillis()
             appDb.ruleSubDao.update(ruleSub)
+        }
+        if (type == 0) {
+            val result = InkRuleSubSync.syncBookSourceSub(ruleSub, applyChanges = silentUpdate)
+            if (!silentUpdate && result.updatedCount > 0) {
+                cacheBookSourceMap[url] = result.parsedSources
+                return true
+            }
+            return false
         }
         var upRules = false
         okHttpClient.newCallResponseBody {

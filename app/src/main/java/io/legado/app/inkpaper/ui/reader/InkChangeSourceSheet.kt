@@ -47,10 +47,13 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.SearchBook
+import io.legado.app.data.entities.SourceHealth
 import io.legado.app.inkpaper.design.InkEmptyState
 import io.legado.app.inkpaper.design.InkFilterChip
 import io.legado.app.inkpaper.design.InkTheme
+import io.legado.app.inkpaper.source.SourceHealthManager
 import io.legado.app.inkpaper.ui.search.InkSearchQueryHelper
 import io.legado.app.model.webBook.WebBook
 import kotlinx.coroutines.Dispatchers
@@ -80,12 +83,36 @@ fun InkChangeSourceSheet(
     var totalSources by remember { mutableIntStateOf(0) }
     var switchingUrl by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var healthMap by remember { mutableStateOf<Map<String, SourceHealth>>(emptyMap()) }
+    var partMap by remember { mutableStateOf<Map<String, BookSourcePart>>(emptyMap()) }
+
+    fun sortResultsByHealth() {
+        val nowMs = System.currentTimeMillis()
+        results.sortByDescending { candidate ->
+            val part = partMap[candidate.origin]
+            SourceHealthManager.computeEffectiveScore(
+                staticWeight = part?.weight ?: 0,
+                customOrder = part?.customOrder ?: candidate.originOrder,
+                health = healthMap[candidate.origin],
+                nowMs = nowMs,
+            )
+        }
+    }
 
     LaunchedEffect(book.bookUrl, refreshKey, searchByAuthor) {
         isSearching = true
         errorMessage = null
         searchedCount = 0
         results.clear()
+
+        val parts = withContext(Dispatchers.IO) {
+            appDb.bookSourceDao.allEnabledPart
+        }
+        val loadedHealth = withContext(Dispatchers.IO) {
+            SourceHealthManager.loadHealthMap()
+        }
+        partMap = parts.associateBy { it.bookSourceUrl }
+        healthMap = loadedHealth
 
         if (!searchByAuthor) {
             val cached = withContext(Dispatchers.IO) {
@@ -95,6 +122,7 @@ fun InkChangeSourceSheet(
             }
             if (cached.isNotEmpty()) {
                 results.addAll(cached.distinctBy { it.origin })
+                sortResultsByHealth()
             }
         }
 
@@ -104,9 +132,6 @@ fun InkChangeSourceSheet(
             InkSearchQueryHelper.normalizeQuery(book.name)
         }
 
-        val parts = withContext(Dispatchers.IO) {
-            appDb.bookSourceDao.allEnabledPart
-        }
         totalSources = parts.size
         val semaphore = Semaphore(6)
         withContext(Dispatchers.IO) {
@@ -143,7 +168,7 @@ fun InkChangeSourceSheet(
                                                 results.add(candidate)
                                             }
                                         }
-                                        results.sortBy { it.originOrder }
+                                        sortResultsByHealth()
                                     }
                                 }
                             }
@@ -330,7 +355,9 @@ fun InkChangeSourceSheet(
                                         )
                                     }
                                 }
+                                val badge = SourceHealthManager.statusBadge(healthMap[item.origin])
                                 val subParts = listOfNotNull(
+                                    badge,
                                     if (!InkSearchQueryHelper.isSameBookTitle(item.name, book.name)) "站内名：《${item.name}》" else null,
                                     item.latestChapterTitle?.takeIf { it.isNotBlank() }?.let { "最新：$it" },
                                 ).joinToString(" · ")

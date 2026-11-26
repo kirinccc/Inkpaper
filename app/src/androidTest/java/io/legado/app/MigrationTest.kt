@@ -550,4 +550,41 @@ class MigrationTest {
             database.close()
         }
     }
+
+    @Test
+    @Throws(IOException::class)
+    fun migrate113To114AddsSourceHealth() {
+        val databaseName = "migration-source-health"
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.deleteDatabase(databaseName)
+        helper.createDatabase(databaseName, 113).close()
+
+        Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .addMigrations(*ALL_MIGRATIONS)
+            .build().apply {
+                openHelper.writableDatabase.query("PRAGMA table_info(source_health)").use { cursor ->
+                    val nameIndex = cursor.getColumnIndexOrThrow("name")
+                    val columns = buildSet {
+                        while (cursor.moveToNext()) add(cursor.getString(nameIndex))
+                    }
+                    assertEquals(
+                        setOf(
+                            "sourceUrl",
+                            "contentOkCount",
+                            "contentFailCount",
+                            "consecutiveFailCount",
+                            "truncatedCount",
+                            "adErrorCount",
+                            "garbledCount",
+                            "avgContentLatencyMs",
+                            "circuitOpenUntil",
+                            "lastFailReason",
+                            "updatedAt",
+                        ),
+                        columns,
+                    )
+                }
+                close()
+            }
+    }
 }

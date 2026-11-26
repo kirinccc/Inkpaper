@@ -1,5 +1,6 @@
 package io.legado.app.help
 
+import io.legado.app.BuildConfig
 import io.legado.app.constant.AppConst
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
@@ -7,6 +8,7 @@ import io.legado.app.data.entities.DictRule
 import io.legado.app.data.entities.HttpTTS
 import io.legado.app.data.entities.KeyboardAssist
 import io.legado.app.data.entities.RssSource
+import io.legado.app.data.entities.RuleSub
 import io.legado.app.data.entities.TxtTocRule
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
@@ -140,9 +142,20 @@ object DefaultData {
             }
             return sources.size
         }
-        // 增量升级：清理失效内置源并补齐新增的内置精选源，不覆盖用户自定义源
+        // 增量升级：清理失效内置源、停用已知半残源并补齐新增的内置精选源，不覆盖用户自定义源
         appDb.bookSourceDao.getBookSource("https://reading.snssdk.com#lcs")?.let { obsolete ->
             SourceHelp.deleteBookSource(obsolete.bookSourceUrl)
+        }
+        appDb.bookSourceDao.getBookSource("https://7xdian.com")?.let { brokenQidian ->
+            if (brokenQidian.enabled || brokenQidian.weight > 0) {
+                appDb.bookSourceDao.update(
+                    brokenQidian.copy(
+                        enabled = false,
+                        weight = -50,
+                        bookSourceGroup = "仅目录·半残停用",
+                    ),
+                )
+            }
         }
         val missing = sources.filter { src ->
             appDb.bookSourceDao.getBookSource(src.bookSourceUrl) == null
@@ -191,6 +204,24 @@ object DefaultData {
     }
 
     suspend fun syncAutoUpdateBookSourceSubs() {
+        val injectedSubUrl = BuildConfig.INKPAPER_DEFAULT_SUB_URL.trim()
+        if (injectedSubUrl.isNotBlank() && appDb.ruleSubDao.findByUrl(injectedSubUrl) == null) {
+            runCatching {
+                appDb.ruleSubDao.insert(
+                    RuleSub(
+                        name = BuildConfig.INKPAPER_DEFAULT_SUB_NAME.ifBlank { "私有精选订阅" },
+                        url = injectedSubUrl,
+                        type = 0,
+                        customOrder = 0,
+                        autoUpdate = true,
+                        silentUpdate = true,
+                        update = 0L,
+                        updateInterval = 24,
+                        js = "@mirror",
+                    ),
+                )
+            }.onFailure { it.printOnDebug() }
+        }
         val now = System.currentTimeMillis()
         appDb.ruleSubDao.all
             .filter { it.type == 0 && it.autoUpdate && it.url.isNotBlank() }

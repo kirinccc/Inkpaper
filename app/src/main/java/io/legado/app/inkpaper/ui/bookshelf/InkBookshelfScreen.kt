@@ -89,6 +89,7 @@ fun InkBookshelfScreen(
     onOpenSearch: () -> Unit,
     onOpenDetail: (Book) -> Unit,
     onOpenBookSources: () -> Unit,
+    onOpenBackup: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: InkBookshelfViewModel = viewModel(),
 ) {
@@ -100,6 +101,7 @@ fun InkBookshelfScreen(
     val userGroups by viewModel.userGroups.collectAsStateWithLifecycle()
     val selectedFilter by viewModel.selectedFilter.collectAsStateWithLifecycle()
     val continueBook by viewModel.continueBook.collectAsStateWithLifecycle()
+    val enabledSourceCount by viewModel.enabledSourceCount.collectAsStateWithLifecycle()
 
     var showMoreSheet by remember { mutableStateOf(false) }
     var showLocalImportSheet by remember { mutableStateOf(false) }
@@ -183,22 +185,30 @@ fun InkBookshelfScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                InkEmptyState(
-                    title = if (allBooks.isEmpty()) "书架还是空的" else "该分组暂无书籍",
-                    subtitle = if (allBooks.isEmpty()) {
-                        "去搜索想读的小说，或导入本地 TXT / EPUB 书籍"
-                    } else {
-                        "切换其他分组看看，或把书籍加入当前分组"
-                    },
-                    actionLabel = if (allBooks.isEmpty()) "搜索找书" else "查看全部",
-                    onAction = {
-                        if (allBooks.isEmpty()) {
-                            onOpenSearch()
+                if (allBooks.isEmpty() && enabledSourceCount == 0) {
+                    ColdStartOnboardingCard(
+                        onImportLocal = { showLocalImportSheet = true },
+                        onOpenBookSources = onOpenBookSources,
+                        onOpenBackup = onOpenBackup,
+                    )
+                } else {
+                    InkEmptyState(
+                        title = if (allBooks.isEmpty()) "书架还是空的" else "该分组暂无书籍",
+                        subtitle = if (allBooks.isEmpty()) {
+                            "去搜索想读的小说，或导入本地 TXT / EPUB 书籍"
                         } else {
-                            viewModel.selectFilter(ShelfFilter.All)
-                        }
-                    },
-                )
+                            "切换其他分组看看，或把书籍加入当前分组"
+                        },
+                        actionLabel = if (allBooks.isEmpty()) "搜索找书" else "查看全部",
+                        onAction = {
+                            if (allBooks.isEmpty()) {
+                                onOpenSearch()
+                            } else {
+                                viewModel.selectFilter(ShelfFilter.All)
+                            }
+                        },
+                    )
+                }
             }
         } else if (uiPrefs.bookshelfGrid) {
             LazyVerticalGrid(
@@ -658,4 +668,52 @@ private fun formatProgressText(book: Book): String {
         .roundToInt()
         .coerceIn(1, 99)
     return "已读 $percent%"
+}
+
+@Composable
+private fun ColdStartOnboardingCard(
+    onImportLocal: () -> Unit,
+    onOpenBookSources: () -> Unit,
+    onOpenBackup: () -> Unit,
+) {
+    val colors = InkTheme.colors
+    InkCardGroup(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 20.dp),
+        ) {
+            Text(
+                text = "欢迎使用 InkPaper",
+                color = colors.ink,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "当前尚未启用任何在线书源。你可以直接导入本地书籍，或添加外部书源订阅 / 连接 WebDAV 恢复个人配置。",
+                color = colors.inkSecondary,
+                fontSize = 13.sp,
+                lineHeight = 19.sp,
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            InkListRow(
+                title = "导入本地 TXT / EPUB",
+                onClick = onImportLocal,
+            )
+            InkListRow(
+                title = "添加或管理书源订阅",
+                onClick = onOpenBookSources,
+            )
+            InkListRow(
+                title = "从 WebDAV 恢复配置与书源",
+                showDivider = false,
+                onClick = onOpenBackup,
+            )
+        }
+    }
 }

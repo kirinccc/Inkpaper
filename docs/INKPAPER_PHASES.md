@@ -108,3 +108,11 @@
 - **站内无缝直达与增量书源升级**：`InkPlatformHintsCard` 由跳转外部网页改为调用 `InkBookUrlResolver` 站内直达书籍详情页与阅读器；`LocalConfig.needUpBookSources`（v2）与 `DefaultData.importDefaultBookSources` 升级为增量补齐内置源并清理已失效旧源。
 - **弱相关噪声折叠**：新增 `InkSearchQueryHelper.isStrongSearchMatch`，当远程源返回大量无关单字分词结果时自动折叠弱相关条目，确保改名/兜底面板始终置顶可见。
 - **书源质量修正与社区订阅预设**：下线失效的 `reading.snssdk.com#lcs`，将易产生单字噪声的 `移动阅读` 降级为长尾备用，修复 `潇湘书院` 作者名 PUA 乱码，新增实测可用的 `大唐小说 / 塔读小说 / SF轻小说`，并在订阅管理提供 `XIU2 / YCK / Yiove` 一键订阅预设。
+
+---
+
+## Phase 10：书源闭环自愈、深层验源与合规解耦（已完成）
+
+- **正文语义质检与深层验源**：新增 `ContentQualityValidator` 与 `ContentQualityException`，识别试读截断、VIP/广告/防爬拦截页及未解密 PUA 乱码；升级 `CheckSourceChapterSelection` 与 `CheckSourceService` 抽检首章 + 深水区/VIP 章节，并在内置 `bookSources.json` 停用半残的 `7xdian.com`。
+- **动态健康度评分与无感整书切源**：新增 Room `source_health` 表（v114 迁移）与 `SourceHealthManager`，实现 6 小时短熔断 / 7 天长熔断；改造 `SearchModel.mergeItems()` 与 `InkChangeSourceSheet` 按健康度评分择优主源与排序；新增 `InkAutoSourceFallback` 接入 `CacheBook`，在预加载/阅读遇阻时自动对齐目录并整书无感切换健康源。
+- **合规解耦与双轨订阅**：新增 `oss` 纯净开源 Flavor（空内置源 + 隐藏社区预设 + 空源冷启动引导卡片），`app` 变体支持通过 `local.properties` 注入私有订阅与 Bearer Token；新增 `InkRuleSubSync` 统一订阅同步并支持 `@mirror` 镜像死源自动禁用；升级 `tools/check_book_sources.py` 并新增内核级 `BookSourceFullChainVerifyTest`。

@@ -25,7 +25,30 @@ object DatabaseMigrations {
             migration_39_40, migration_40_41, migration_41_42, migration_42_43,
             migration_100_101, migration_104_105, migration_105_106, migration_106_107,
             migration_107_108, migration_108_109, migration_109_110, migration_112_113,
+            migration_113_114,
         )
+    }
+
+    private val migration_113_114 = object : Migration(113, 114) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """CREATE TABLE IF NOT EXISTS `source_health` (
+                `sourceUrl` TEXT NOT NULL,
+                `contentOkCount` INTEGER NOT NULL,
+                `contentFailCount` INTEGER NOT NULL,
+                `consecutiveFailCount` INTEGER NOT NULL,
+                `truncatedCount` INTEGER NOT NULL,
+                `adErrorCount` INTEGER NOT NULL,
+                `garbledCount` INTEGER NOT NULL,
+                `avgContentLatencyMs` INTEGER NOT NULL,
+                `circuitOpenUntil` INTEGER NOT NULL,
+                `lastFailReason` TEXT NOT NULL,
+                `updatedAt` INTEGER NOT NULL,
+                PRIMARY KEY(`sourceUrl`),
+                FOREIGN KEY(`sourceUrl`) REFERENCES `book_sources`(`bookSourceUrl`) ON UPDATE NO ACTION ON DELETE CASCADE
+                )""".trimIndent()
+            )
+        }
     }
 
     private val migration_112_113 = object : Migration(112, 113) {

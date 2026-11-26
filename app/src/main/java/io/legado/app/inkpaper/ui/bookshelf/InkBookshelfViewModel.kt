@@ -62,6 +62,10 @@ class InkBookshelfViewModel : ViewModel() {
         .map { list -> list.maxByOrNull { it.durChapterTime }?.takeIf { it.durChapterTime > 0L } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    val enabledSourceCount: StateFlow<Int> = appDb.bookSourceDao.flowEnabled()
+        .map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), -1)
+
     fun selectFilter(filter: ShelfFilter) {
         _selectedFilter.value = filter
     }

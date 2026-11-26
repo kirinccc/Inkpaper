@@ -22,6 +22,7 @@ import io.legado.app.help.IntentData
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.source.exploreKinds
 import io.legado.app.help.source.SuppressSourceNavigation
+import io.legado.app.inkpaper.source.ContentQualityValidator
 import io.legado.app.model.CheckSource
 import io.legado.app.model.CheckSourceResult
 import io.legado.app.model.CheckSourceStatus
@@ -393,22 +394,30 @@ class CheckSourceService : BaseService() {
             if (!CheckSource.checkCategory || source.bookSourceType == BookSourceType.file) {
                 return
             }
-            //校验目录
-            val chapterSelection = selectCheckSourceChapter(
+            //校验目录（首章 + 深层/VIP章双点抽样）
+            val selections = selectDeepCheckSourceChapters(
                 chapters = WebBook.getChapterListAwait(source, book).getOrThrow(),
                 emptyMessage = getString(R.string.chapter_list_empty),
             )
             if (!CheckSource.checkContent) {
                 return
             }
-            //校验正文
-            WebBook.getContentAwait(
-                bookSource = source,
-                book = book,
-                bookChapter = chapterSelection.chapter,
-                nextChapterUrl = chapterSelection.nextChapterUrl,
-                needSave = false
-            )
+            //校验正文及语义质量
+            for (chapterSelection in selections) {
+                val content = WebBook.getContentAwait(
+                    bookSource = source,
+                    book = book,
+                    bookChapter = chapterSelection.chapter,
+                    nextChapterUrl = chapterSelection.nextChapterUrl,
+                    needSave = false
+                )
+                if (source.bookSourceType == BookSourceType.default) {
+                    val quality = ContentQualityValidator.validate(content, chapterSelection.chapter.title)
+                    if (!quality.isHealthy) {
+                        throw ContentEmptyException("正文质量不达标(${chapterSelection.chapter.title}): ${quality.reason}")
+                    }
+                }
+            }
         }.onFailure {
             val bookType = if (isSearchBook) "搜索" else "发现"
             when (it) {

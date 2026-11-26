@@ -16,6 +16,7 @@ import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.http.text
 import io.legado.app.help.source.SourceHelp
+import io.legado.app.inkpaper.source.InkRuleSubSync
 import io.legado.app.model.CheckSource
 import io.legado.app.ui.association.BookSourceImportJson
 import io.legado.app.ui.association.parseBookSourceJson
@@ -216,26 +217,15 @@ class InkBookSourcesViewModel : ViewModel() {
     private suspend fun syncSubscriptionInternal(sub: RuleSub) {
         _isSyncingSub.value = true
         runCatching {
-            val content = fetchUrlText(sub.url)
-            val parsed = parseBookSources(content)
-            if (parsed.isEmpty()) error("未解析到有效书源")
-            val toInsert = mutableListOf<BookSource>()
-            for (incoming in parsed) {
-                val local = appDb.bookSourceDao.getBookSourcePart(incoming.bookSourceUrl)
-                if (local == null || local.lastUpdateTime < incoming.lastUpdateTime) {
-                    if (local != null && !local.bookSourceGroup.isNullOrBlank()) {
-                        incoming.bookSourceGroup = local.bookSourceGroup
-                    }
-                    toInsert.add(incoming)
-                }
+            InkRuleSubSync.syncBookSourceSub(sub, applyChanges = true)
+        }.onSuccess { res ->
+            val prunedSuffix = if (res.disabledMirrorCount > 0) {
+                "，已禁用 ${res.disabledMirrorCount} 个失效旧源"
+            } else {
+                ""
             }
-            if (toInsert.isNotEmpty()) {
-                SourceHelp.insertBookSource(*toInsert.toTypedArray())
-            }
-            appDb.ruleSubDao.update(sub.copy(update = System.currentTimeMillis()))
-            parsed.size to toInsert.size
-        }.onSuccess { (total, updated) ->
-            _statusMessage.value = "订阅「${sub.name}」同步完成：解析 $total 个，更新/新增 $updated 个"
+            _statusMessage.value =
+                "订阅「${sub.name}」同步完成：解析 ${res.parsedCount} 个，更新/新增 ${res.updatedCount} 个$prunedSuffix"
         }.onFailure { err ->
             _statusMessage.value = "订阅同步失败：${err.localizedMessage ?: "网络或格式错误"}"
         }

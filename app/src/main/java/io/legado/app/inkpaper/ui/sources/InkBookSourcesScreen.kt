@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.legado.app.BuildConfig
 import io.legado.app.data.entities.BookSourceCheckState
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.RuleSub
@@ -580,47 +581,49 @@ fun InkBookSourcesScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text("书源订阅管理", color = colors.ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                Text("快捷添加社区维护订阅", color = colors.inkSecondary, fontSize = 12.sp)
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    InkFilterChip(
-                        text = "XIU2 精选源",
-                        selected = false,
-                        onClick = {
-                            if (!isSyncingSub) {
-                                viewModel.addSubscription(
-                                    "XIU2 精选源",
-                                    "https://cdn.jsdmirror.com/gh/XIU2/Yuedu/shuyuan",
-                                )
-                            }
-                        },
-                    )
-                    InkFilterChip(
-                        text = "YCK 综合源",
-                        selected = false,
-                        onClick = {
-                            if (!isSyncingSub) {
-                                viewModel.addSubscription(
-                                    "YCK 综合源",
-                                    "https://cdn.jsdelivr.net/gh/liufuyou/read@main/sources/yck-novel.json",
-                                )
-                            }
-                        },
-                    )
-                    InkFilterChip(
-                        text = "Yiove 综合源",
-                        selected = false,
-                        onClick = {
-                            if (!isSyncingSub) {
-                                viewModel.addSubscription(
-                                    "Yiove 综合源",
-                                    "https://cdn.jsdelivr.net/gh/liufuyou/read@main/sources/yiove-novel.json",
-                                )
-                            }
-                        },
-                    )
+                if (!BuildConfig.IS_OSS_BUILD) {
+                    Text("快捷添加社区维护订阅", color = colors.inkSecondary, fontSize = 12.sp)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        InkFilterChip(
+                            text = "XIU2 精选源",
+                            selected = false,
+                            onClick = {
+                                if (!isSyncingSub) {
+                                    viewModel.addSubscription(
+                                        "XIU2 精选源",
+                                        "https://cdn.jsdmirror.com/gh/XIU2/Yuedu/shuyuan",
+                                    )
+                                }
+                            },
+                        )
+                        InkFilterChip(
+                            text = "YCK 综合源",
+                            selected = false,
+                            onClick = {
+                                if (!isSyncingSub) {
+                                    viewModel.addSubscription(
+                                        "YCK 综合源",
+                                        "https://cdn.jsdelivr.net/gh/liufuyou/read@main/sources/yck-novel.json",
+                                    )
+                                }
+                            },
+                        )
+                        InkFilterChip(
+                            text = "Yiove 综合源",
+                            selected = false,
+                            onClick = {
+                                if (!isSyncingSub) {
+                                    viewModel.addSubscription(
+                                        "Yiove 综合源",
+                                        "https://cdn.jsdelivr.net/gh/liufuyou/read@main/sources/yiove-novel.json",
+                                    )
+                                }
+                            },
+                        )
+                    }
                 }
                 OutlinedTextField(
                     value = subName,

@@ -151,6 +151,7 @@ fun InkAppRoot(
                         navController.navigate(InkRoute.bookDetail(book.bookUrl))
                     },
                     onOpenBookSources = { navController.navigate(InkRoute.BOOK_SOURCES) },
+                    onOpenBackup = { navController.navigate(InkRoute.BACKUP) },
                 )
             }
             composable(InkRoute.DISCOVER) {
