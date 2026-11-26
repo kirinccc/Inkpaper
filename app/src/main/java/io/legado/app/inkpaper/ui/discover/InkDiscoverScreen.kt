@@ -52,6 +52,7 @@ import io.legado.app.ui.rss.source.manage.RssSourceActivity
 fun InkDiscoverScreen(
     onOpenSearch: () -> Unit,
     onOpenExplore: (String) -> Unit,
+    onOpenBookSources: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = InkTheme.colors
@@ -128,9 +129,7 @@ fun InkDiscoverScreen(
                             text = "管理 ›",
                             color = colors.inkSecondary,
                             fontSize = 12.5.sp,
-                            modifier = Modifier.clickable {
-                                context.startActivity(Intent(context, BookSourceActivity::class.java))
-                            },
+                            modifier = Modifier.clickable(onClick = onOpenBookSources),
                         )
                     }
                 }
@@ -141,9 +140,7 @@ fun InkDiscoverScreen(
                             title = "暂无可发现书源",
                             subtitle = "请在书源管理中导入或启用支持发现的书源",
                             actionLabel = "前往书源管理",
-                            onAction = {
-                                context.startActivity(Intent(context, BookSourceActivity::class.java))
-                            },
+                            onAction = onOpenBookSources,
                         )
                     }
                 } else {

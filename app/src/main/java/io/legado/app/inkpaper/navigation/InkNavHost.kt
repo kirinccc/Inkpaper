@@ -43,6 +43,10 @@ import io.legado.app.inkpaper.ui.discover.InkDiscoverScreen
 import io.legado.app.inkpaper.ui.discover.InkExploreBooksScreen
 import io.legado.app.inkpaper.ui.me.InkMeScreen
 import io.legado.app.inkpaper.ui.search.InkSearchScreen
+import io.legado.app.inkpaper.ui.settings.InkBackupScreen
+import io.legado.app.inkpaper.ui.settings.InkReadHabitsScreen
+import io.legado.app.inkpaper.ui.settings.InkReplaceRulesScreen
+import io.legado.app.inkpaper.ui.sources.InkBookSourcesScreen
 
 private object InkRoute {
     const val BOOKSHELF = "bookshelf"
@@ -51,6 +55,10 @@ private object InkRoute {
     const val SEARCH = "search"
     const val BOOK_DETAIL = "book_detail/{bookKey}"
     const val EXPLORE = "explore/{sourceKey}"
+    const val BOOK_SOURCES = "book_sources"
+    const val REPLACE_RULES = "replace_rules"
+    const val BACKUP = "backup"
+    const val READ_HABITS = "read_habits"
 
     fun bookDetail(bookUrl: String): String = "book_detail/${InkNavCache.encodeKey(bookUrl)}"
     fun explore(sourceUrl: String): String = "explore/${InkNavCache.encodeKey(sourceUrl)}"
@@ -117,6 +125,7 @@ fun InkAppRoot(
                         InkNavCache.putBook(book)
                         navController.navigate(InkRoute.bookDetail(book.bookUrl))
                     },
+                    onOpenBookSources = { navController.navigate(InkRoute.BOOK_SOURCES) },
                 )
             }
             composable(InkRoute.DISCOVER) {
@@ -125,10 +134,16 @@ fun InkAppRoot(
                     onOpenExplore = { sourceUrl ->
                         navController.navigate(InkRoute.explore(sourceUrl))
                     },
+                    onOpenBookSources = { navController.navigate(InkRoute.BOOK_SOURCES) },
                 )
             }
             composable(InkRoute.ME) {
-                InkMeScreen()
+                InkMeScreen(
+                    onOpenReadHabits = { navController.navigate(InkRoute.READ_HABITS) },
+                    onOpenBookSources = { navController.navigate(InkRoute.BOOK_SOURCES) },
+                    onOpenReplaceRules = { navController.navigate(InkRoute.REPLACE_RULES) },
+                    onOpenBackup = { navController.navigate(InkRoute.BACKUP) },
+                )
             }
             composable(InkRoute.SEARCH) {
                 InkSearchScreen(
@@ -164,6 +179,18 @@ fun InkAppRoot(
                         navController.navigate(InkRoute.bookDetail(searchBook.bookUrl))
                     },
                 )
+            }
+            composable(InkRoute.BOOK_SOURCES) {
+                InkBookSourcesScreen(onBack = { navController.popBackStack() })
+            }
+            composable(InkRoute.REPLACE_RULES) {
+                InkReplaceRulesScreen(onBack = { navController.popBackStack() })
+            }
+            composable(InkRoute.BACKUP) {
+                InkBackupScreen(onBack = { navController.popBackStack() })
+            }
+            composable(InkRoute.READ_HABITS) {
+                InkReadHabitsScreen(onBack = { navController.popBackStack() })
             }
         }
     }

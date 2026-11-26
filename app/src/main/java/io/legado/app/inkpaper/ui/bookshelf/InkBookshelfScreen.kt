@@ -71,8 +71,7 @@ import io.legado.app.inkpaper.design.InkPageHeader
 import io.legado.app.inkpaper.design.InkSwitch
 import io.legado.app.inkpaper.design.InkTheme
 import io.legado.app.inkpaper.design.InkThemeController
-import io.legado.app.ui.book.import.local.ImportBookActivity
-import io.legado.app.ui.book.source.manage.BookSourceActivity
+import io.legado.app.inkpaper.ui.settings.InkLocalImportSheet
 import io.legado.app.utils.startActivityForBook
 import kotlin.math.roundToInt
 
@@ -81,6 +80,7 @@ import kotlin.math.roundToInt
 fun InkBookshelfScreen(
     onOpenSearch: () -> Unit,
     onOpenDetail: (Book) -> Unit,
+    onOpenBookSources: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: InkBookshelfViewModel = viewModel(),
 ) {
@@ -94,6 +94,7 @@ fun InkBookshelfScreen(
     val continueBook by viewModel.continueBook.collectAsStateWithLifecycle()
 
     var showMoreSheet by remember { mutableStateOf(false) }
+    var showLocalImportSheet by remember { mutableStateOf(false) }
     var actionBook by remember { mutableStateOf<Book?>(null) }
     var confirmRemoveBook by remember { mutableStateOf<Book?>(null) }
 
@@ -350,7 +351,7 @@ fun InkBookshelfScreen(
                     },
                     onClick = {
                         showMoreSheet = false
-                        context.startActivity(Intent(context, ImportBookActivity::class.java))
+                        showLocalImportSheet = true
                     },
                 )
                 InkListRow(
@@ -365,11 +366,15 @@ fun InkBookshelfScreen(
                     showDivider = false,
                     onClick = {
                         showMoreSheet = false
-                        context.startActivity(Intent(context, BookSourceActivity::class.java))
+                        onOpenBookSources()
                     },
                 )
             }
         }
+    }
+
+    if (showLocalImportSheet) {
+        InkLocalImportSheet(onDismiss = { showLocalImportSheet = false })
     }
 
     actionBook?.let { book ->

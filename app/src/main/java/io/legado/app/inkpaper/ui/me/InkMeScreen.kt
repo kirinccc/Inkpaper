@@ -59,17 +59,16 @@ import io.legado.app.inkpaper.design.InkTheme
 import io.legado.app.inkpaper.design.InkThemeController
 import io.legado.app.inkpaper.design.InkThemePreset
 import io.legado.app.inkpaper.design.toColors
+import androidx.compose.material.icons.outlined.Tune
+import io.legado.app.inkpaper.ui.settings.InkLocalImportSheet
 import io.legado.app.ui.about.AboutActivity
 import io.legado.app.ui.about.ReadRecordActivity
 import io.legado.app.ui.autoTask.AutoTaskActivity
 import io.legado.app.ui.book.bookmark.AllBookmarkActivity
-import io.legado.app.ui.book.import.local.ImportBookActivity
-import io.legado.app.ui.book.source.manage.BookSourceActivity
 import io.legado.app.ui.book.toc.rule.TxtTocRuleActivity
 import io.legado.app.ui.config.ConfigActivity
 import io.legado.app.ui.config.ConfigTag
 import io.legado.app.ui.dict.rule.DictRuleActivity
-import io.legado.app.ui.replace.ReplaceRuleActivity
 import io.legado.app.ui.rss.source.manage.RssSourceActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -77,6 +76,10 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InkMeScreen(
+    onOpenReadHabits: () -> Unit,
+    onOpenBookSources: () -> Unit,
+    onOpenReplaceRules: () -> Unit,
+    onOpenBackup: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = InkTheme.colors
@@ -95,6 +98,7 @@ fun InkMeScreen(
     }
 
     var showAdvancedSheet by remember { mutableStateOf(false) }
+    var showLocalImportSheet by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -211,6 +215,22 @@ fun InkMeScreen(
             item {
                 InkCardGroup {
                     InkListRow(
+                        title = "阅读与通用习惯",
+                        leading = {
+                            Icon(Icons.Outlined.Tune, contentDescription = null, tint = colors.inkSecondary, modifier = Modifier.size(20.dp))
+                        },
+                        trailing = {
+                            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = colors.inkSecondary)
+                        },
+                        showDivider = false,
+                        onClick = onOpenReadHabits,
+                    )
+                }
+            }
+
+            item {
+                InkCardGroup {
+                    InkListRow(
                         title = "书源管理",
                         leading = {
                             Icon(Icons.Outlined.Source, contentDescription = null, tint = colors.inkSecondary, modifier = Modifier.size(20.dp))
@@ -218,7 +238,7 @@ fun InkMeScreen(
                         trailing = {
                             Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = colors.inkSecondary)
                         },
-                        onClick = { context.startActivity(Intent(context, BookSourceActivity::class.java)) },
+                        onClick = onOpenBookSources,
                     )
                     InkListRow(
                         title = "替换净化规则",
@@ -228,7 +248,7 @@ fun InkMeScreen(
                         trailing = {
                             Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = colors.inkSecondary)
                         },
-                        onClick = { context.startActivity(Intent(context, ReplaceRuleActivity::class.java)) },
+                        onClick = onOpenReplaceRules,
                     )
                     InkListRow(
                         title = "导入本地书籍",
@@ -239,7 +259,7 @@ fun InkMeScreen(
                             Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = colors.inkSecondary)
                         },
                         showDivider = false,
-                        onClick = { context.startActivity(Intent(context, ImportBookActivity::class.java)) },
+                        onClick = { showLocalImportSheet = true },
                     )
                 }
             }
@@ -255,13 +275,7 @@ fun InkMeScreen(
                         trailing = {
                             Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = colors.inkSecondary)
                         },
-                        onClick = {
-                            context.startActivity(
-                                Intent(context, ConfigActivity::class.java).apply {
-                                    putExtra("configTag", ConfigTag.BACKUP_CONFIG)
-                                },
-                            )
-                        },
+                        onClick = onOpenBackup,
                     )
                     InkListRow(
                         title = "阅读记录",
@@ -297,6 +311,10 @@ fun InkMeScreen(
                 }
             }
         }
+    }
+
+    if (showLocalImportSheet) {
+        InkLocalImportSheet(onDismiss = { showLocalImportSheet = false })
     }
 
     if (showAdvancedSheet) {
