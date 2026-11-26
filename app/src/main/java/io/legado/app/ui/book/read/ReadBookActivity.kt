@@ -180,7 +180,17 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import androidx.core.net.toUri
+import androidx.core.graphics.toColorInt
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.Lifecycle
+import io.legado.app.inkpaper.design.InkPaperTheme
+import io.legado.app.inkpaper.design.InkThemeController
+import io.legado.app.inkpaper.design.InkThemePreset
+import io.legado.app.inkpaper.ui.reader.InkReaderActions
+import io.legado.app.inkpaper.ui.reader.InkReaderOverlay
+import io.legado.app.inkpaper.ui.reader.InkReaderOverlayState
+import io.legado.app.utils.postEvent
+import io.legado.app.utils.putPrefBoolean
 import com.script.rhino.runScriptWithContext
 import io.legado.app.model.analyzeRule.AnalyzeUrl.Companion.paramPattern
 import io.legado.app.ui.login.SourceLoginJsExtensions
@@ -276,6 +286,8 @@ class ReadBookActivity : BaseReadBookActivity(),
         }
     }
     private var menu: Menu? = null
+    private val inkOverlayState = mutableStateOf(InkReaderOverlayState())
+    override fun isInkOverlayVisible(): Boolean = inkOverlayState.value.visible
     private var backupJob: Job? = null
     private var bookmarkJob: Job? = null
     private var replacePreviewJob: Job? = null
@@ -535,6 +547,7 @@ class ReadBookActivity : BaseReadBookActivity(),
         window.setBackgroundDrawable(null)
         upScreenTimeOut()
         ReadBook.register(this)
+        initInkOverlay()
         binding.readView.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
             val width = right - left
             val height = bottom - top
@@ -586,6 +599,10 @@ class ReadBookActivity : BaseReadBookActivity(),
             }
         }
         onBackPressedDispatcher.addCallback(this) {
+            if (inkOverlayState.value.visible) {
+                hideInkOverlay()
+                return@addCallback
+            }
             if (isShowingSearchResult) {
                 exitSearchMenu()
                 restoreLastBookProcess()
@@ -1926,7 +1943,7 @@ class ReadBookActivity : BaseReadBookActivity(),
      * 显示菜单
      */
     override fun showMenuBar() {
-        binding.readMenu.runMenuIn()
+        showInkOverlay()
     }
 
     /**
@@ -2046,7 +2063,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             BaseReadAloudService.isRun -> showReadAloudDialog()
             isAutoPage -> showDialogFragment<AutoReadDialog>()
             isShowingSearchResult -> binding.searchMenu.runMenuIn()
-            else -> binding.readMenu.runMenuIn()
+            else -> showInkOverlay()
         }
     }
 
@@ -3460,6 +3477,188 @@ class ReadBookActivity : BaseReadBookActivity(),
             } else {
                 keepScreenOn(false)
             }
+        }
+    }
+
+    private fun initInkOverlay() {
+        binding.inkReaderOverlay.setContent {
+            InkPaperTheme {
+                InkReaderOverlay(
+                    state = inkOverlayState.value,
+                    actions = inkReaderActions,
+                )
+            }
+        }
+    }
+
+    private fun syncInkOverlayState(visible: Boolean) {
+        val current = inkOverlayState.value
+        val curBg = ReadBookConfig.durConfig.curBgStr()
+        val isNightNow = AppConfig.isNightTheme ||
+            curBg.equals("#141413", ignoreCase = true) ||
+            curBg.equals("#000000", ignoreCase = true)
+        inkOverlayState.value = current.copy(
+            visible = visible,
+            bookTitle = ReadBook.book?.name.orEmpty(),
+            chapterTitle = ReadBook.curTextChapter?.title.orEmpty(),
+            chapterIndex = ReadBook.durChapterIndex,
+            totalChapters = ReadBook.chapterSize.coerceAtLeast(1),
+            isNight = isNightNow,
+            brightnessAuto = getPrefBoolean("brightnessAuto", true),
+            brightness = (AppConfig.readBrightness / 255f).coerceIn(0.01f, 1f),
+            showQuickSettings = if (visible) current.showQuickSettings else false,
+            showMoreActions = if (visible) current.showMoreActions else false,
+        )
+    }
+
+    private fun showInkOverlay() {
+        syncInkOverlayState(visible = true)
+        onMenuShow()
+        upSystemUiVisibility()
+    }
+
+    private fun hideInkOverlay() {
+        if (!inkOverlayState.value.visible) return
+        syncInkOverlayState(visible = false)
+        onMenuHide()
+        upSystemUiVisibility()
+    }
+
+    private val inkReaderActions = object : InkReaderActions {
+        override fun onDismiss() {
+            hideInkOverlay()
+        }
+
+        override fun onBack() {
+            hideInkOverlay()
+            finish()
+        }
+
+        override fun onToggleBookmark() {
+            addBookmark()
+        }
+
+        override fun onPrevChapter() {
+            if (ReadBook.moveToPrevChapter(upContent = true, toLast = false)) {
+                syncInkOverlayState(visible = true)
+            }
+        }
+
+        override fun onNextChapter() {
+            if (ReadBook.moveToNextChapter(upContent = true)) {
+                syncInkOverlayState(visible = true)
+            }
+        }
+
+        override fun onSeekChapter(index: Int) {
+            if (index != ReadBook.durChapterIndex) {
+                viewModel.openChapter(index) {
+                    syncInkOverlayState(visible = true)
+                }
+            }
+        }
+
+        override fun onOpenToc() {
+            hideInkOverlay()
+            openChapterList()
+        }
+
+        override fun onOpenAloud() {
+            hideInkOverlay()
+            if (BaseReadAloudService.isRun) {
+                showReadAloudDialog()
+            } else {
+                ReadBook.readAloud()
+            }
+        }
+
+        override fun onToggleNight() {
+            val nextNight = !inkOverlayState.value.isNight
+            if (nextNight) {
+                InkThemeController.selectPreset(InkThemePreset.INK_NIGHT)
+                onBackgroundChanged("#141413", "#C9C7C0", false)
+            } else {
+                InkThemeController.selectPreset(InkThemePreset.PAPER)
+                onBackgroundChanged("#F7F6F3", "#1B1B18", true)
+            }
+            inkOverlayState.value = inkOverlayState.value.copy(isNight = nextNight)
+        }
+
+        override fun onOpenQuickSettings() {
+            inkOverlayState.value = inkOverlayState.value.copy(showQuickSettings = true)
+        }
+
+        override fun onCloseQuickSettings() {
+            inkOverlayState.value = inkOverlayState.value.copy(showQuickSettings = false)
+        }
+
+        override fun onOpenMoreActions() {
+            inkOverlayState.value = inkOverlayState.value.copy(showMoreActions = true)
+        }
+
+        override fun onCloseMoreActions() {
+            inkOverlayState.value = inkOverlayState.value.copy(showMoreActions = false)
+        }
+
+        override fun onOpenChangeSource() {
+            hideInkOverlay()
+            showBookChangeSource()
+        }
+
+        override fun onOpenSearchContent() {
+            hideInkOverlay()
+            openSearchActivity(null)
+        }
+
+        override fun onRefreshChapter() {
+            hideInkOverlay()
+            refreshDurChapter()
+        }
+
+        override fun onToggleAutoPage() {
+            hideInkOverlay()
+            autoPage()
+        }
+
+        override fun onOpenBookDetail() {
+            hideInkOverlay()
+            openBookInfoActivity()
+        }
+
+        override fun onOpenMoreTypography() {
+            hideInkOverlay()
+            showDialogFragment<MoreConfigDialog>()
+        }
+
+        override fun onTypographyChanged() {
+            ReadBookConfig.save()
+            ChapterProvider.upStyle()
+            ReadBook.loadContent(resetPageOffset = false)
+            upContent()
+        }
+
+        override fun onBackgroundChanged(bgHex: String, textHex: String, darkStatusIcon: Boolean) {
+            ReadBookConfig.durConfig.setCurBg(0, bgHex)
+            ReadBookConfig.durConfig.setCurTextColor(textHex.toColorInt())
+            ReadBookConfig.durConfig.setCurStatusIconDark(darkStatusIcon)
+            ReadBookConfig.upBg(binding.readView.width, binding.readView.height)
+            ReadBookConfig.save()
+            binding.readView.upBg()
+            postEvent(EventBus.UP_CONFIG, arrayListOf(1, 2, 6))
+            upSystemUiVisibility()
+        }
+
+        override fun onPageAnimChanged(anim: Int) {
+            ReadBookConfig.pageAnim = anim
+            ReadBookConfig.save()
+            binding.readView.upPageAnim()
+            postEvent(EventBus.UP_CONFIG, arrayListOf(3))
+        }
+
+        override fun onBrightnessChanged(auto: Boolean, value: Float) {
+            putPrefBoolean("brightnessAuto", auto)
+            AppConfig.readBrightness = (value * 255f).toInt().coerceIn(1, 255)
+            binding.readMenu.upBrightnessState()
         }
     }
 

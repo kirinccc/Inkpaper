@@ -17,6 +17,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.help.book.BookContent
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.help.font.BuiltinFonts
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.read.page.entities.TextLine
@@ -625,6 +626,10 @@ object ChapterProvider {
     }
 
     private fun loadTypeface(fontPath: String): Typeface? = when {
+        BuiltinFonts.isBuiltin(fontPath) -> {
+            BuiltinFonts.createTypeface(appCtx, fontPath)
+        }
+
         fontPath.isContentScheme() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> {
             appCtx.contentResolver.openFileDescriptor(fontPath.toUri(), "r")!!.use {
                 Typeface.Builder(it.fileDescriptor).build()

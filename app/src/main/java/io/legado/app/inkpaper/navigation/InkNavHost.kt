@@ -1,0 +1,201 @@
+package io.legado.app.inkpaper.navigation
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.outlined.PersonOutline
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import io.legado.app.inkpaper.design.InkTheme
+import io.legado.app.inkpaper.ui.bookdetail.InkBookDetailScreen
+import io.legado.app.inkpaper.ui.bookshelf.InkBookshelfScreen
+import io.legado.app.inkpaper.ui.discover.InkDiscoverScreen
+import io.legado.app.inkpaper.ui.me.InkMeScreen
+import io.legado.app.inkpaper.ui.search.InkSearchScreen
+
+private object InkRoute {
+    const val BOOKSHELF = "bookshelf"
+    const val DISCOVER = "discover"
+    const val ME = "me"
+    const val SEARCH = "search"
+    const val BOOK_DETAIL = "book_detail/{bookKey}"
+
+    fun bookDetail(bookUrl: String): String = "book_detail/${InkNavCache.encodeKey(bookUrl)}"
+}
+
+private data class InkTabItem(
+    val route: String,
+    val label: String,
+    val icon: ImageVector,
+)
+
+private val mainTabs = listOf(
+    InkTabItem(InkRoute.BOOKSHELF, "书架", Icons.AutoMirrored.Outlined.MenuBook),
+    InkTabItem(InkRoute.DISCOVER, "发现", Icons.Outlined.Explore),
+    InkTabItem(InkRoute.ME, "我的", Icons.Outlined.PersonOutline),
+)
+
+@Composable
+fun InkAppRoot(
+    onTabRouteChanged: (String?) -> Unit = {},
+) {
+    val colors = InkTheme.colors
+    val navController = rememberNavController()
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route
+    onTabRouteChanged(currentRoute)
+
+    val showBottomBar = currentRoute in setOf(
+        InkRoute.BOOKSHELF,
+        InkRoute.DISCOVER,
+        InkRoute.ME,
+    )
+
+    Scaffold(
+        containerColor = colors.bg,
+        bottomBar = {
+            if (showBottomBar) {
+                InkBottomBar(
+                    currentRoute = currentRoute,
+                    onSelectTab = { route ->
+                        navController.navigate(route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
+            }
+        },
+    ) { innerPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = InkRoute.BOOKSHELF,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = innerPadding.calculateBottomPadding()),
+        ) {
+            composable(InkRoute.BOOKSHELF) {
+                InkBookshelfScreen(
+                    onOpenSearch = { navController.navigate(InkRoute.SEARCH) },
+                    onOpenDetail = { book ->
+                        InkNavCache.putBook(book)
+                        navController.navigate(InkRoute.bookDetail(book.bookUrl))
+                    },
+                )
+            }
+            composable(InkRoute.DISCOVER) {
+                InkDiscoverScreen(
+                    onOpenSearch = { navController.navigate(InkRoute.SEARCH) },
+                )
+            }
+            composable(InkRoute.ME) {
+                InkMeScreen()
+            }
+            composable(InkRoute.SEARCH) {
+                InkSearchScreen(
+                    onBack = { navController.popBackStack() },
+                    onSelectResult = { searchBook ->
+                        InkNavCache.putSearchBook(searchBook)
+                        navController.navigate(InkRoute.bookDetail(searchBook.bookUrl))
+                    },
+                )
+            }
+            composable(
+                route = InkRoute.BOOK_DETAIL,
+                arguments = listOf(navArgument("bookKey") { type = NavType.StringType }),
+            ) { entry ->
+                val encoded = entry.arguments?.getString("bookKey").orEmpty()
+                val bookUrl = InkNavCache.decodeKey(encoded)
+                InkBookDetailScreen(
+                    bookKey = bookUrl,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun InkBottomBar(
+    currentRoute: String?,
+    onSelectTab: (String) -> Unit,
+) {
+    val colors = InkTheme.colors
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colors.surface)
+            .navigationBarsPadding(),
+    ) {
+        HorizontalDivider(thickness = 0.5.dp, color = colors.line)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(60.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            mainTabs.forEach { tab ->
+                val selected = currentRoute == tab.route
+                val tint = if (selected) colors.ink else colors.inkSecondary
+                val interactionSource = remember { MutableInteractionSource() }
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                        ) { onSelectTab(tab.route) }
+                        .padding(vertical = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    Icon(
+                        imageVector = tab.icon,
+                        contentDescription = tab.label,
+                        tint = tint,
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Text(
+                        text = tab.label,
+                        color = tint,
+                        fontSize = 11.sp,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    )
+                }
+            }
+        }
+    }
+}

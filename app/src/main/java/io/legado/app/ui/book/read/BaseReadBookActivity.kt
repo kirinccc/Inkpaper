@@ -88,8 +88,10 @@ abstract class BaseReadBookActivity :
 
     override val binding by viewBinding(ActivityBookReadBinding::inflate)
     override val viewModel by viewModels<ReadBookViewModel>()
+    protected open fun isInkOverlayVisible(): Boolean = false
+
     protected val menuLayoutIsVisible
-        get() = bottomDialog > 0 || binding.readMenu.isVisible || binding.searchMenu.bottomMenuVisible
+        get() = bottomDialog > 0 || binding.readMenu.isVisible || binding.searchMenu.bottomMenuVisible || isInkOverlayVisible()
 
     var bottomDialog = 0
         set(value) {

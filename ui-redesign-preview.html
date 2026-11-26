@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>legado · 界面重设计原型（简约版）</title>
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Serif+SC:wght@400;600&family=Noto+Sans+SC:wght@300;400;500;700&display=swap">
+<style>
+/* ===== 设计变量：黑白灰 + 纸感，无彩色 ===== */
+:root{
+  --bg:#F7F6F3; --surface:#FFFFFF; --ink:#1B1B18; --sub:#9A9890;
+  --line:#E9E7E2; --chip:#EFEDE8; --sans:"Noto Sans SC",-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  --serif:"Noto Serif SC","Songti SC",SimSun,serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:var(--sans);background:#E3E1DC;display:flex;min-height:100vh;align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:24px 0}
+.caption{color:#8B8983;font-size:13px;letter-spacing:.02em}
+.caption b{color:#55534E;font-weight:500}
+
+/* ===== 手机框 ===== */
+.phone{width:390px;height:844px;background:var(--bg);border-radius:44px;border:10px solid #111;position:relative;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.25);color:var(--ink);flex:none}
+.phone.dark{--bg:#121210;--surface:#1C1C19;--ink:#EBEAE5;--sub:#7C7B75;--line:#2A2A26;--chip:#26261F}
+.statusbar{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 26px;font-size:14px;font-weight:500;position:relative;z-index:5}
+.statusbar svg{display:block}
+
+/* ===== 屏幕切换 ===== */
+.screen{position:absolute;inset:44px 0 0 0;overflow-y:auto;padding:8px 22px 96px;display:none;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+.screen.active{display:block}
+h1.page{font-size:30px;font-weight:700;letter-spacing:.01em;margin:10px 0 4px}
+.headrow{display:flex;align-items:center;justify-content:space-between}
+.iconbtn{width:36px;height:36px;border:none;background:none;color:var(--ink);display:flex;align-items:center;justify-content:center;border-radius:50%;cursor:pointer}
+.iconbtn:active{background:var(--chip)}
+
+/* ===== 书架 ===== */
+.chips{display:flex;gap:8px;margin:16px 0 20px}
+.chip{border:none;font-family:var(--sans);font-size:13px;padding:7px 14px;border-radius:999px;background:var(--chip);color:var(--sub);cursor:pointer}
+.chip.on{background:var(--ink);color:var(--bg)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px 14px}
+.book{cursor:pointer}
+.cover{aspect-ratio:3/4.1;border-radius:6px;position:relative;display:flex;align-items:flex-start;justify-content:flex-end;padding:10px 8px;border:1px solid rgba(0,0,0,.06);box-shadow:0 1px 3px rgba(0,0,0,.08);transition:transform .15s}
+.book:active .cover{transform:scale(.96)}
+.cover .ct{writing-mode:vertical-rl;font-family:var(--serif);font-weight:600;font-size:15px;letter-spacing:.14em;line-height:1.3}
+.cover .ca{position:absolute;left:8px;bottom:8px;writing-mode:vertical-rl;font-size:9px;opacity:.55;letter-spacing:.1em}
+.cover .dot{position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:50%;background:var(--ink);border:2px solid var(--bg)}
+.bname{font-size:12.5px;margin-top:8px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bprog{font-size:11px;color:var(--sub);margin-top:2px}
+
+/* ===== 发现 ===== */
+.search{display:flex;align-items:center;gap:8px;background:var(--chip);border-radius:10px;padding:11px 14px;margin:16px 0 24px;color:var(--sub);font-size:14px}
+.sec{font-size:15px;font-weight:700;margin:22px 0 12px;display:flex;justify-content:space-between;align-items:baseline}
+.sec span{font-size:12px;color:var(--sub);font-weight:400}
+.rank{display:flex;align-items:center;gap:14px;padding:10px 0}
+.rank .no{font-family:var(--serif);font-size:17px;color:var(--sub);width:18px;font-style:italic}
+.rank:first-of-type .no{color:var(--ink);font-weight:600}
+.mini{width:34px;height:46px;border-radius:4px;flex:none;display:flex;align-items:flex-start;justify-content:flex-end;padding:4px 3px;border:1px solid rgba(0,0,0,.05)}
+.mini i{writing-mode:vertical-rl;font-style:normal;font-family:var(--serif);font-size:8.5px;letter-spacing:.08em;font-weight:600}
+.rank .rt{flex:1;min-width:0}
+.rank .rt b{display:block;font-size:14px;font-weight:500}
+.rank .rt span{font-size:12px;color:var(--sub)}
+.rank .score{font-size:13px;color:var(--sub);font-family:var(--serif)}
+.srcrow{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
+.srcrow:last-child{border-bottom:none}
+.srcicon{width:38px;height:38px;border-radius:9px;background:var(--chip);display:flex;align-items:center;justify-content:center;color:var(--ink)}
+.srcrow .rt{flex:1}
+.srcrow .rt b{display:block;font-size:14px;font-weight:500}
+.srcrow .rt span{font-size:12px;color:var(--sub)}
+.import{font-family:var(--sans);font-size:12.5px;padding:6px 16px;border-radius:999px;border:1px solid var(--ink);background:none;color:var(--ink);cursor:pointer}
+.import.done{border-color:var(--line);color:var(--sub)}
+
+/* ===== 我的 ===== */
+.profile{display:flex;align-items:center;gap:16px;margin:22px 0 26px}
+.avatar{width:58px;height:58px;border-radius:50%;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:22px}
+.profile b{font-size:18px;display:block}
+.profile span{font-size:12.5px;color:var(--sub)}
+.stats{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 0;margin-bottom:24px}
+.stats div{flex:1;text-align:center}
+.stats b{font-size:18px;font-family:var(--serif);display:block}
+.stats span{font-size:11.5px;color:var(--sub)}
+.stats div+div{border-left:1px solid var(--line)}
+.rows{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;padding:15px 16px;font-size:14.5px;cursor:pointer}
+.row+.row{border-top:1px solid var(--line)}
+.row .grow{flex:1}
+.row svg{color:var(--sub)}
+.switch{width:44px;height:26px;border-radius:999px;background:var(--chip);border:1px solid var(--line);position:relative;cursor:pointer;flex:none;transition:background .2s}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .2s}
+.switch.on{background:var(--ink);border-color:var(--ink)}
+.switch.on::after{left:20px}
+.phone.dark .switch.on::after,.phone[data-bg="black"] .switch.on::after{background:var(--bg)}
+
+/* ===== 底部导航 ===== */
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:78px;background:var(--surface);border-top:1px solid var(--line);display:flex;z-index:6;padding-bottom:14px}
+.tab{flex:1;border:none;background:none;font-family:var(--sans);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;color:var(--sub);cursor:pointer}
+.tab.on{color:var(--ink);font-weight:500}
+
+/* ===== 阅读页 ===== */
+#screen-reader{padding:0;background:transparent}
+.phone[data-bg="paper"]{--bg:#F6F3EC}
+.phone[data-bg="gray"]{--bg:#E9E9E6}
+.phone[data-bg="black"]{--bg:#111110;--ink:#C9C7C0;--sub:#6B6A64;--surface:#1D1D1B;--line:#2E2E2B;--chip:#262624}
+.readwrap{padding:14px 26px 60px;min-height:100%}
+.chap{font-family:var(--serif);font-size:1.25em;font-weight:600;margin:14px 0 22px;letter-spacing:.02em}
+.readwrap p{font-family:var(--serif);text-indent:2em;margin-bottom:1em;letter-spacing:.02em}
+.readwrap.compact p{line-height:1.55!important;margin-bottom:.6em}
+.readmeta{display:flex;justify-content:space-between;font-size:11px;color:var(--sub);padding:20px 26px 24px;font-family:var(--sans)}
+.tapzone{position:absolute;inset:30% 20% 30% 20%;z-index:2}
+
+/* 阅读工具条 */
+.rbar{position:absolute;left:12px;right:12px;background:var(--surface);border:1px solid var(--line);border-radius:14px;display:flex;align-items:center;z-index:8;box-shadow:0 6px 24px rgba(0,0,0,.10);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}
+.rbar.top{top:52px;padding:10px 12px;gap:10px;transform:translateY(-8px)}
+.rbar.bottom{bottom:16px;padding:8px 6px;transform:translateY(8px)}
+.phone.bars .rbar{opacity:1;pointer-events:auto;transform:none}
+.rbar.top b{font-size:14.5px;font-weight:500;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rtool{flex:1;border:none;background:none;font-family:var(--sans);color:var(--ink);display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;padding:8px 0;cursor:pointer;border-radius:10px}
+.rtool:active{background:var(--chip)}
+
+/* ===== 设置抽屉 ===== */
+.backdrop{position:absolute;inset:0;background:rgba(0,0,0,.32);z-index:9;opacity:0;pointer-events:none;transition:opacity .25s}
+.phone.sheet .backdrop{opacity:1;pointer-events:auto}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:22px 22px 0 0;z-index:10;padding:10px 24px 30px;transform:translateY(105%);transition:transform .28s cubic-bezier(.32,.72,.3,1)}
+.phone.sheet .sheet{transform:none}
+.handle{width:36px;height:4px;border-radius:2px;background:var(--line);margin:4px auto 18px}
+.srow{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+.srow .lab{font-size:13.5px;color:var(--sub);width:38px;flex:none}
+.srow .grow{flex:1;display:flex;align-items:center;gap:12px}
+input[type=range]{flex:1;appearance:none;height:3px;border-radius:2px;background:var(--line);outline:none}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:20px;height:20px;border-radius:50%;background:var(--ink);cursor:pointer;border:3px solid var(--surface);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.fval{font-size:13px;width:24px;text-align:center;font-family:var(--serif)}
+.abtn{border:none;background:none;color:var(--ink);cursor:pointer;font-family:var(--serif)}
+.swatches{display:flex;gap:14px}
+.sw{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);cursor:pointer;position:relative}
+.sw.on{outline:2px solid var(--ink);outline-offset:2px}
+.seg{display:flex;background:var(--chip);border-radius:9px;padding:3px;flex:1}
+.seg button{flex:1;border:none;background:none;font-family:var(--sans);font-size:13px;padding:7px 0;border-radius:7px;color:var(--sub);cursor:pointer}
+.seg button.on{background:var(--surface);color:var(--ink);font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.togglerow{display:flex;align-items:center;justify-content:space-between;font-size:14px;margin-bottom:18px}
+.morebtn{width:100%;border:1px solid var(--line);background:none;color:var(--ink);font-family:var(--sans);font-size:14px;padding:13px 0;border-radius:12px;cursor:pointer;margin-top:4px}
+
+/* ===== 小屏适配：手机铺满 ===== */
+@media (max-width:480px){
+  body{padding:0;background:var(--bg)}
+  .caption{display:none}
+  .phone{width:100vw;height:100vh;height:100dvh;border-radius:0;border:none;box-shadow:none}
+}
+</style>
+</head>
+<body>
+
+<div class="phone" id="phone" data-bg="">
+  <div class="statusbar">
+    <span>9:41</span>
+    <svg width="58" height="14" viewBox="0 0 58 14" fill="currentColor"><path d="M1 9h2v3H1zM5 7h2v5H5zM9 4h2v8H9zM13 1h2v11h-2z"/><path d="M24 5.5a7 7 0 0 1 10 0l-1.4 1.4a5 5 0 0 0-7.2 0zM26.8 8.3a3.2 3.2 0 0 1 4.4 0L29 10.5z"/><rect x="40" y="2" width="15" height="9" rx="2.5" fill="none" stroke="currentColor"/><rect x="42" y="4" width="9" height="5" rx="1"/><rect x="56" y="4.5" width="1.6" height="4" rx=".8"/></svg>
+  </div>
+
+  <!-- ===== 视图：书架 ===== -->
+  <section class="screen active" id="screen-shelf">
+    <div class="headrow">
+      <h1 class="page">书架</h1>
+      <button class="iconbtn" title="搜索"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.8-3.8"/></svg></button>
+    </div>
+    <div class="chips" id="chips">
+      <button class="chip on">全部</button><button class="chip">在读</button><button class="chip">分组</button><button class="chip">已读完</button>
+    </div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <!-- ===== 视图：发现 ===== -->
+  <section class="screen" id="screen-discover">
+    <h1 class="page">发现</h1>
+    <div class="search">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.8-3.8"/></svg>
+      搜索书籍、作者、书源
+    </div>
+    <div class="sec">热门榜单 <span>更多 ›</span></div>
+    <div id="ranks"></div>
+    <div class="sec">书源广场 <span>管理 ›</span></div>
+    <div id="sources"></div>
+  </section>
+
+  <!-- ===== 视图：我的 ===== -->
+  <section class="screen" id="screen-me">
+    <h1 class="page">我的</h1>
+    <div class="profile">
+      <div class="avatar">陈</div>
+      <div><b>Kirin</b><span>已陪伴阅读 214 天</span></div>
+    </div>
+    <div class="stats">
+      <div><b>326</b><span>阅读时长 / 小时</span></div>
+      <div><b>41</b><span>读完书籍</span></div>
+      <div><b>12</b><span>启用书源</span></div>
+    </div>
+    <div class="rows">
+      <div class="row"><span class="grow">深色模式</span><div class="switch" id="darkSwitch"></div></div>
+      <div class="row"><span class="grow">主题与外观</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m9 5 7 7-7 7"/></svg></div>
+      <div class="row"><span class="grow">备份与恢复</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m9 5 7 7-7 7"/></svg></div>
+      <div class="row"><span class="grow">书源管理</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m9 5 7 7-7 7"/></svg></div>
+      <div class="row"><span class="grow">关于阅读</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m9 5 7 7-7 7"/></svg></div>
+    </div>
+  </section>
+
+  <!-- ===== 视图：阅读 ===== -->
+  <section class="screen" id="screen-reader">
+    <div class="tapzone" id="tapzone"></div>
+    <div class="readwrap" id="readwrap">
+      <div class="chap">故乡</div>
+      <p>我冒了严寒，回到相隔二千余里，别了二十余年的故乡去。</p>
+      <p>时候既然是深冬；渐近故乡时，天气又阴晦了，冷风吹进船舱中，呜呜的响，从篷隙向外一望，苍黄的天底下，远近横着几个萧索的荒村，没有一些活气。我的心禁不住悲凉起来了。</p>
+      <p>阿！这不是我二十年来时时记得的故乡？</p>
+      <p>我所记得的故乡全不如此。我的故乡好得多了。但要我记起他的美丽，说出他的佳处来，却又没有影像，没有言辞了。仿佛也就如此。于是我自己解释说：故乡本也如此，——虽然没有进步，也未必有如我所感的悲凉，这只是我自己心情的改变罢了，因为我这次回乡，本没有什么好心绪。</p>
+      <p>我这次是专为了别他而来的。我们多年聚族而居的老屋，已经公同卖给别姓了，交屋的期限，只在本年，所以必须赶在正月初一以前，永别了熟识的老屋，而且远离了熟识的故乡，搬家到我在谋食的异地去。</p>
+      <p>第二日清早晨我到了我家的门口了。瓦楞上许多枯草的断茎当风抖着，正在说明这老屋难免易主的原因。几房的本家大约已经搬走了，所以很寂静。我到了自家的房外，我的母亲早已迎着出来了，接着便飞出了八岁的侄儿宏儿。</p>
+    </div>
+    <div class="readmeta"><span>128 / 356</span><span>鲁迅 · 示例正文</span></div>
+  </section>
+
+  <!-- ===== 阅读工具条 ===== -->
+  <div class="rbar top" id="rbarTop">
+    <button class="iconbtn" id="backBtn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <b id="readerTitle">故乡</b>
+    <button class="iconbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+  </div>
+  <div class="rbar bottom" id="rbarBottom">
+    <button class="rtool"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>目录</button>
+    <button class="rtool"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14v-2a9 9 0 0 1 18 0v2"/><rect x="3" y="14" width="4" height="6" rx="1.5"/><rect x="17" y="14" width="4" height="6" rx="1.5"/></svg>听书</button>
+    <button class="rtool" id="nightBtn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13.5A8 8 0 1 1 10.5 4 6.5 6.5 0 0 0 20 13.5z"/></svg>夜间</button>
+    <button class="rtool" id="setBtn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg>设置</button>
+  </div>
+
+  <!-- ===== 设置抽屉 ===== -->
+  <div class="backdrop" id="backdrop"></div>
+  <div class="sheet" id="sheet">
+    <div class="handle"></div>
+    <div class="srow">
+      <span class="lab">字号</span>
+      <div class="grow">
+        <button class="abtn" style="font-size:13px" id="fMinus">A</button>
+        <input type="range" id="fRange" min="14" max="26" value="19">
+        <button class="abtn" style="font-size:20px" id="fPlus">A</button>
+        <span class="fval" id="fVal">19</span>
+      </div>
+    </div>
+    <div class="srow">
+      <span class="lab">背景</span>
+      <div class="swatches" id="swatches">
+        <div class="sw on" data-bg="paper" style="background:#F6F3EC" title="纸白"></div>
+        <div class="sw" data-bg="gray" style="background:#E9E9E6" title="浅灰"></div>
+        <div class="sw" data-bg="black" style="background:#151513" title="夜间"></div>
+      </div>
+    </div>
+    <div class="srow">
+      <span class="lab">翻页</span>
+      <div class="seg" id="pageSeg">
+        <button class="on">仿真</button><button>覆盖</button><button>滑动</button>
+      </div>
+    </div>
+    <div class="togglerow"><span>行距紧凑</span><div class="switch" id="compactSwitch"></div></div>
+    <div class="togglerow"><span>护眼模式</span><div class="switch" id="eyeSwitch"></div></div>
+    <button class="morebtn" id="moreBtn">更多设置</button>
+  </div>
+
+  <!-- ===== 底部导航 ===== -->
+  <nav class="tabbar" id="tabbar">
+    <button class="tab on" data-tab="shelf"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h5v16H4zM9 4h5v16H9z"/><path d="m14.5 5 4.5-1 3 15.5-4.5 1z"/></svg>书架</button>
+    <button class="tab" data-tab="discover"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg>发现</button>
+    <button class="tab" data-tab="me"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>我的</button>
+  </nav>
+</div>
+
+<p class="caption"><b>legado 界面重设计原型</b> · 点击封面进入阅读，点正文中部唤出工具条 · 数据为示例</p>
+
+<script>
+/* ===== 示例数据（黑白灰封面，无彩色） ===== */
+const books=[
+  {t:"长安的荔枝",a:"马伯庸",p:"已读 62%",bg:"#E7E4DD",fg:"#3A3833",dot:true},
+  {t:"三体",a:"刘慈欣",p:"已读 28%",bg:"#26261F",fg:"#D8D6CF"},
+  {t:"活着",a:"余华",p:"已读 45%",bg:"#D9D6CE",fg:"#4A4842"},
+  {t:"人类简史",a:"尤瓦尔·赫拉利",p:"已读 71%",bg:"#EFEDE7",fg:"#55534C"},
+  {t:"故乡",a:"鲁迅",p:"已读 12%",bg:"#C9C6BD",fg:"#33312C"},
+  {t:"月亮与六便士",a:"毛姆",p:"已读 36%",bg:"#3B3B36",fg:"#E0DED7"},
+  {t:"小王子",a:"圣埃克苏佩里",p:"已读 100%",bg:"#E3E0D8",fg:"#45433D"},
+  {t:"平凡的世界",a:"路遥",p:"已读 8%",bg:"#B5B2A9",fg:"#2E2C28"},
+  {t:"围城",a:"钱锺书",p:"未开始",bg:"#F0EEE9",fg:"#5A5850"}
+];
+const ranks=[
+  {t:"诡秘之主",a:"爱潜水的乌贼 · 玄幻",s:"9.2",bg:"#26261F",fg:"#D8D6CF"},
+  {t:"大奉打更人",a:"卖报小郎君 · 仙侠",s:"8.9",bg:"#D9D6CE",fg:"#4A4842"},
+  {t:"凡人修仙传",a:"忘语 · 仙侠",s:"8.8",bg:"#E7E4DD",fg:"#3A3833"}
+];
+const sources=[
+  {t:"精品小说源",d:"1,204 个站点 · 昨日更新"},
+  {t:"漫画合集源",d:"86 个站点 · 3 天前更新"}
+];
+
+/* ===== 渲染书架与发现 ===== */
+const grid=document.getElementById('grid');
+books.forEach((b,i)=>{
+  const el=document.createElement('div');el.className='book';
+  el.innerHTML=`<div class="cover" style="background:${b.bg};color:${b.fg}">
+    <span class="ct">${b.t}</span><span class="ca">${b.a}</span>${b.dot?'<span class="dot"></span>':''}
+  </div><div class="bname">${b.t}</div><div class="bprog">${b.p}</div>`;
+  el.onclick=()=>openBook(b);
+  grid.appendChild(el);
+});
+const rk=document.getElementById('ranks');
+ranks.forEach((b,i)=>{
+  const el=document.createElement('div');el.className='rank';
+  el.innerHTML=`<span class="no">${i+1}</span>
+    <div class="mini" style="background:${b.bg};color:${b.fg}"><i>${b.t}</i></div>
+    <div class="rt"><b>${b.t}</b><span>${b.a}</span></div><span class="score">${b.s}</span>`;
+  rk.appendChild(el);
+});
+const sc=document.getElementById('sources');
+sources.forEach(s=>{
+  const el=document.createElement('div');el.className='srcrow';
+  el.innerHTML=`<div class="srcicon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zm0 0a2 2 0 0 0 2 2h13"/></svg></div>
+    <div class="rt"><b>${s.t}</b><span>${s.d}</span></div><button class="import">导入</button>`;
+  const btn=el.querySelector('.import');
+  btn.onclick=()=>{const done=btn.classList.toggle('done');btn.textContent=done?'已导入':'导入';};
+  sc.appendChild(el);
+});
+
+/* ===== 状态与导航 ===== */
+const phone=document.getElementById('phone');
+const tabbar=document.getElementById('tabbar');
+const state={tab:'shelf',reading:false,fontSize:19,bg:'paper'};
+
+function showTab(name){
+  state.reading=false;
+  phone.classList.remove('bars','sheet');
+  phone.dataset.bg='';
+  tabbar.style.display='flex';
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.tab===name));
+  state.tab=name;
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>showTab(t.dataset.tab));
+
+/* 筛选胶囊 */
+document.querySelectorAll('#chips .chip').forEach(c=>c.onclick=()=>{
+  document.querySelectorAll('#chips .chip').forEach(x=>x.classList.remove('on'));
+  c.classList.add('on');
+});
+
+/* ===== 阅读 ===== */
+function openBook(b){
+  state.reading=true;
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-reader').classList.add('active');
+  document.getElementById('readerTitle').textContent=b.t;
+  tabbar.style.display='none';
+  phone.dataset.bg=state.bg;
+  phone.classList.remove('bars','sheet');
+  document.getElementById('screen-reader').scrollTop=0;
+}
+document.getElementById('tapzone').onclick=()=>phone.classList.toggle('bars');
+document.getElementById('backBtn').onclick=()=>showTab('shelf');
+
+/* 夜间快捷切换 */
+document.getElementById('nightBtn').onclick=()=>{
+  setBg(state.bg==='black'?'paper':'black');
+};
+
+/* ===== 设置抽屉 ===== */
+document.getElementById('setBtn').onclick=()=>phone.classList.add('sheet');
+document.getElementById('backdrop').onclick=()=>phone.classList.remove('sheet');
+document.getElementById('moreBtn').onclick=()=>phone.classList.remove('sheet');
+
+const readwrap=document.getElementById('readwrap');
+const fRange=document.getElementById('fRange'),fVal=document.getElementById('fVal');
+function setFont(v){
+  v=Math.min(26,Math.max(14,v));
+  state.fontSize=v;fRange.value=v;fVal.textContent=v;
+  readwrap.style.fontSize=v+'px';
+  readwrap.querySelectorAll('p').forEach(p=>p.style.lineHeight=1.85);
+}
+fRange.oninput=()=>setFont(+fRange.value);
+document.getElementById('fMinus').onclick=()=>setFont(state.fontSize-1);
+document.getElementById('fPlus').onclick=()=>setFont(state.fontSize+1);
+setFont(19);
+
+function setBg(bg){
+  state.bg=bg;phone.dataset.bg=bg;
+  document.querySelectorAll('#swatches .sw').forEach(s=>s.classList.toggle('on',s.dataset.bg===bg));
+}
+document.querySelectorAll('#swatches .sw').forEach(s=>s.onclick=()=>setBg(s.dataset.bg));
+
+document.querySelectorAll('#pageSeg button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#pageSeg button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+});
+
+/* 开关：行距紧凑真实生效，护眼为示意 */
+document.getElementById('compactSwitch').onclick=function(){
+  this.classList.toggle('on');
+  readwrap.classList.toggle('compact',this.classList.contains('on'));
+};
+document.getElementById('eyeSwitch').onclick=function(){this.classList.toggle('on');};
+
+/* 全局深色模式 */
+document.getElementById('darkSwitch').onclick=function(){
+  this.classList.toggle('on');
+  phone.classList.toggle('dark',this.classList.contains('on'));
+};
+</script>
+</body>
+</html>
