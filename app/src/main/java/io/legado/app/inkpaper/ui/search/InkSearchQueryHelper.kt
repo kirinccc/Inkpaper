@@ -73,7 +73,7 @@ object InkSearchQueryHelper {
         val trimmed = rawInput.trim()
         if (trimmed.isEmpty()) return null
         if (fanqieIdRegex.matches(trimmed)) {
-            return "https://reading.snssdk.com/reading/bookapi/detail/v/?book_id=$trimmed"
+            return "https://fanqienovel.com/api/book/info?bookId=$trimmed"
         }
         val match = urlExtractRegex.find(trimmed) ?: return null
         return match.value.replace(trailingPunctuationRegex, "").takeIf { it.isNotBlank() }

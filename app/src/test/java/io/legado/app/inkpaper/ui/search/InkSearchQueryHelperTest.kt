@@ -32,7 +32,7 @@ class InkSearchQueryHelperTest {
     fun extractBookUrlOrId_recognizesFanqieIdShareTextAndRejectsPlainTitles() {
         val id = "7285555567827880975"
         assertEquals(
-            "https://reading.snssdk.com/reading/bookapi/detail/v/?book_id=$id",
+            "https://fanqienovel.com/api/book/info?bookId=$id",
             InkSearchQueryHelper.extractBookUrlOrId(id),
         )
         assertTrue(InkSearchQueryHelper.isFanqieUrlOrId(id))

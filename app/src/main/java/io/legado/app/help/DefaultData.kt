@@ -126,14 +126,31 @@ object DefaultData {
     }
 
     fun importDefaultBookSources(overwriteExisting: Boolean = false): Int {
-        if (!overwriteExisting && appDb.bookSourceDao.allCount() > 0) {
-            return 0
-        }
         val sources = bookSources
-        if (sources.isNotEmpty()) {
-            SourceHelp.insertBookSource(*sources.toTypedArray())
+        if (overwriteExisting) {
+            if (sources.isNotEmpty()) {
+                SourceHelp.insertBookSource(*sources.toTypedArray())
+            }
+            return sources.size
         }
-        return sources.size
+        val existingCount = appDb.bookSourceDao.allCount()
+        if (existingCount == 0) {
+            if (sources.isNotEmpty()) {
+                SourceHelp.insertBookSource(*sources.toTypedArray())
+            }
+            return sources.size
+        }
+        // 增量升级：清理失效内置源并补齐新增的内置精选源，不覆盖用户自定义源
+        appDb.bookSourceDao.getBookSource("https://reading.snssdk.com#lcs")?.let { obsolete ->
+            SourceHelp.deleteBookSource(obsolete.bookSourceUrl)
+        }
+        val missing = sources.filter { src ->
+            appDb.bookSourceDao.getBookSource(src.bookSourceUrl) == null
+        }
+        if (missing.isNotEmpty()) {
+            SourceHelp.insertBookSource(*missing.toTypedArray())
+        }
+        return missing.size
     }
 
     fun resetToDefaultBookSources(): Int {

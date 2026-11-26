@@ -97,6 +97,14 @@
 
 ## Phase 8：番茄实时线索发现、噪声折叠与社区书源扩充（已完成）
 
-- **实时平台线索发现**：新增 `InkPlatformHintFetcher` 对接公开 `novel.snssdk.com` 搜索接口；当本地书源未强命中时，自动在结果页顶部呈现「番茄书库关联结果」，直接展示原名/曾用名、作者与简介，支持一键改搜或直达番茄网页版免费阅读。
+- **实时平台线索发现**：新增 `InkPlatformHintFetcher` 对接公开 `novel.snssdk.com` 搜索接口；当本地书源未强命中时，自动在结果页顶部呈现「番茄书库关联结果」，直接展示原名/曾用名、作者与简介，支持一键改搜或直达站内阅读。
+- **弱匹配噪声折叠与常用社区书源**：新增 `InkSearchQueryHelper.isStrongSearchMatch` 将无关模糊单字结果折叠，保持搜书页素净；新增「XIU2 / YCK / Yiove」1-Tap 精选订阅推荐芯片与长尾稳定免费源。
+
+---
+
+## Phase 9：番茄官方检索与全本直连原生阅读（已完成）
+
+- **内置「番茄小说」直连精选书源**：集成 `novel.snssdk.com` 搜索 + `fanqienovel.com` 官方详情与目录 + 全本正文直连（含网页端 PUA 字体映射解密兜底），支持直接拉取完整目录并进入 InkPaper 原生阅读器阅读全本章节。
+- **站内无缝直达与增量书源升级**：`InkPlatformHintsCard` 由跳转外部网页改为调用 `InkBookUrlResolver` 站内直达书籍详情页与阅读器；`LocalConfig.needUpBookSources`（v2）与 `DefaultData.importDefaultBookSources` 升级为增量补齐内置源并清理已失效旧源。
 - **弱相关噪声折叠**：新增 `InkSearchQueryHelper.isStrongSearchMatch`，当远程源返回大量无关单字分词结果时自动折叠弱相关条目，确保改名/兜底面板始终置顶可见。
 - **书源质量修正与社区订阅预设**：下线失效的 `reading.snssdk.com#lcs`，将易产生单字噪声的 `移动阅读` 降级为长尾备用，修复 `潇湘书院` 作者名 PUA 乱码，新增实测可用的 `大唐小说 / 塔读小说 / SF轻小说`，并在订阅管理提供 `XIU2 / YCK / Yiove` 一键订阅预设。

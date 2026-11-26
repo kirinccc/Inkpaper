@@ -94,6 +94,7 @@ fun InkSearchScreen(
 
     var showAddUrlSheet by remember { mutableStateOf(false) }
     var urlSheetInitialInput by remember { mutableStateOf("") }
+    var openingHintBookId by remember { mutableStateOf<String?>(null) }
 
     val webSearchLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
@@ -362,18 +363,20 @@ fun InkSearchScreen(
                         item(key = "platform_hints_card") {
                             InkPlatformHintsCard(
                                 hints = state.platformHints,
+                                openingBookId = openingHintBookId.takeIf { state.isAddingUrl },
+                                errorMessage = state.urlAddError.takeIf { !showAddUrlSheet },
                                 onSearchText = { nextQuery ->
                                     keyboard?.hide()
                                     viewModel.submitSearch(nextQuery)
                                 },
-                                onOpenWebPage = { hint ->
-                                    webSearchLauncher.launch(
-                                        Intent(context, WebViewActivity::class.java).apply {
-                                            putExtra("url", hint.webUrl)
-                                            putExtra("title", hint.title)
-                                            putExtra("enableSearchReturn", true)
-                                        },
-                                    )
+                                onOpenInApp = { hint ->
+                                    keyboard?.hide()
+                                    openingHintBookId = hint.bookId
+                                    viewModel.clearUrlAddError()
+                                    viewModel.addBookByUrlOrId(hint.bookId) { book ->
+                                        openingHintBookId = null
+                                        onBookAddedByUrl(book)
+                                    }
                                 },
                             )
                         }
@@ -513,8 +516,10 @@ fun InkSearchScreen(
 @Composable
 private fun InkPlatformHintsCard(
     hints: List<InkPlatformBookHint>,
+    openingBookId: String?,
+    errorMessage: String?,
     onSearchText: (String) -> Unit,
-    onOpenWebPage: (InkPlatformBookHint) -> Unit,
+    onOpenInApp: (InkPlatformBookHint) -> Unit,
 ) {
     val colors = InkTheme.colors
     InkCardGroup {
@@ -525,15 +530,24 @@ private fun InkPlatformHintsCard(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "番茄书库关联结果（可直接网页免费阅读或改搜）",
+                text = "番茄书库关联结果（点击直接站内打开阅读）",
                 color = colors.ink,
                 fontSize = 13.5.sp,
                 fontWeight = FontWeight.SemiBold,
             )
+            if (!errorMessage.isNullOrBlank()) {
+                Text(
+                    text = errorMessage,
+                    color = colors.inkSecondary,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                )
+            }
             hints.forEachIndexed { index, hint ->
                 if (index > 0) {
                     HorizontalDivider(thickness = 0.5.dp, color = colors.line)
                 }
+                val isOpeningThis = openingBookId == hint.bookId
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = hint.title,
@@ -542,6 +556,9 @@ private fun InkPlatformHintsCard(
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.clickable(enabled = openingBookId == null) {
+                            onOpenInApp(hint)
+                        },
                     )
                     val meta = listOfNotNull(
                         hint.author.takeIf { it.isNotBlank() },
@@ -572,7 +589,16 @@ private fun InkPlatformHintsCard(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         InkFilterChip(
-                            text = "搜书名",
+                            text = if (isOpeningThis) "正在打开..." else "站内详情阅读",
+                            selected = true,
+                            onClick = {
+                                if (openingBookId == null) {
+                                    onOpenInApp(hint)
+                                }
+                            },
+                        )
+                        InkFilterChip(
+                            text = "搜改后书名",
                             selected = false,
                             onClick = { onSearchText(hint.title) },
                         )
@@ -583,11 +609,6 @@ private fun InkPlatformHintsCard(
                                 onClick = { onSearchText(hint.author) },
                             )
                         }
-                        InkFilterChip(
-                            text = "番茄网页免费阅读 ↗",
-                            selected = true,
-                            onClick = { onOpenWebPage(hint) },
-                        )
                     }
                 }
             }

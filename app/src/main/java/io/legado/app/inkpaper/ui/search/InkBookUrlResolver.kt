@@ -16,7 +16,7 @@ sealed interface InkBookUrlResolveResult {
 
 object InkBookUrlResolver {
 
-    private const val FANQIE_MAIN_SOURCE_URL = "https://reading.snssdk.com#lcs"
+    private const val FANQIE_MAIN_SOURCE_URL = "https://fanqienovel.com"
 
     suspend fun resolve(rawInput: String): InkBookUrlResolveResult {
         val extractedUrl = InkSearchQueryHelper.extractBookUrlOrId(rawInput)
@@ -49,7 +49,7 @@ object InkBookUrlResolver {
                     return InkBookUrlResolveResult.Success(retryFanqie)
                 }
                 return InkBookUrlResolveResult.Failure(
-                    message = "番茄书源解析失败，请确认已在书源管理中登录番茄账号",
+                    message = "番茄书源解析失败，请检查网络或尝试在书源管理中登录番茄账号",
                     needEnableSource = true,
                 )
             }
